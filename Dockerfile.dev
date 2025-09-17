@@ -1,0 +1,26 @@
+# Development Dockerfile with hot-reloading
+FROM golang:1.23-alpine
+
+# Install development tools
+RUN apk add --no-cache git make curl
+
+# Install swag for API documentation
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod ./
+
+# Download dependencies (this will generate go.sum)
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Expose ports
+EXPOSE 8080 9090 8081
+
+# Run the application directly (hot-reloading via Tilt live_update)
+CMD ["go", "run", "./gateway/main.go"]

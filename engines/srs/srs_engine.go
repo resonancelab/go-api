@@ -63,6 +63,13 @@ type Literal struct {
 	Negated  bool `json:"negated"`
 }
 
+// SubsetSumConstraint represents a subset sum constraint
+type SubsetSumConstraint struct {
+	Numbers []float64 `json:"numbers"`
+	Target  float64   `json:"target"`
+	Weight  float64   `json:"weight"`
+}
+
 // ProblemSpace defines the search space for the NP problem
 type ProblemSpace struct {
 	Dimensions  int                    `json:"dimensions"`
@@ -151,6 +158,10 @@ func (srs *SRSEngine) SolveProblem(problemType string, spec map[string]interface
 	srs.bestSolution = nil
 	srs.telemetryPoints = make([]types.TelemetryPoint, 0)
 
+	// DEBUG: Log start of problem solving
+	fmt.Printf("[SRS] Starting %s problem solving with max_iterations=%d, particles=%d\n",
+		problemType, srs.config.MaxIterations, srs.config.ParticleCount)
+
 	// Parse problem specification
 	if err := srs.parseProblemSpec(problemType, spec); err != nil {
 		return nil, nil, fmt.Errorf("failed to parse problem: %w", err)
@@ -186,8 +197,13 @@ func (srs *SRSEngine) parseProblemSpec(problemType string, spec map[string]inter
 
 // parse3SAT parses a 3-SAT problem specification
 func (srs *SRSEngine) parse3SAT(spec map[string]interface{}) error {
-	variables, ok := spec["variables"].(float64)
-	if !ok {
+	var variables float64
+	switch v := spec["variables"].(type) {
+	case float64:
+		variables = v
+	case int:
+		variables = float64(v)
+	default:
 		return fmt.Errorf("variables field missing or invalid")
 	}
 
@@ -233,8 +249,13 @@ func (srs *SRSEngine) parse3SAT(spec map[string]interface{}) error {
 				return fmt.Errorf("literal %d in clause %d has invalid format", j, i)
 			}
 
-			variable, ok := literalMap["var"].(float64)
-			if !ok {
+			var variable float64
+			switch v := literalMap["var"].(type) {
+			case float64:
+				variable = v
+			case int:
+				variable = float64(v)
+			default:
 				return fmt.Errorf("variable field missing in literal %d of clause %d", j, i)
 			}
 
@@ -268,8 +289,73 @@ func (srs *SRSEngine) parseKSAT(spec map[string]interface{}) error {
 
 // parseSubsetSum parses a subset sum problem
 func (srs *SRSEngine) parseSubsetSum(spec map[string]interface{}) error {
-	// TODO: Implement subset sum parsing
-	return fmt.Errorf("subset sum parsing not yet implemented")
+	// Extract numbers array
+	numbersInterface, ok := spec["numbers"]
+	if !ok {
+		return fmt.Errorf("numbers field missing")
+	}
+
+	numbersArray, ok := numbersInterface.([]interface{})
+	if !ok {
+		return fmt.Errorf("numbers field invalid format")
+	}
+
+	// Extract target sum
+	targetInterface, ok := spec["target"]
+	if !ok {
+		return fmt.Errorf("target field missing")
+	}
+
+	var target float64
+	switch v := targetInterface.(type) {
+	case float64:
+		target = v
+	case int:
+		target = float64(v)
+	default:
+		return fmt.Errorf("target field invalid format")
+	}
+
+	// Convert numbers to float64
+	numbers := make([]float64, len(numbersArray))
+	for i, numInterface := range numbersArray {
+		switch v := numInterface.(type) {
+		case float64:
+			numbers[i] = v
+		case int:
+			numbers[i] = float64(v)
+		default:
+			return fmt.Errorf("number at index %d has invalid format", i)
+		}
+	}
+
+	// Create problem space
+	srs.problemSpace = &ProblemSpace{
+		Dimensions:  len(numbers),
+		Variables:   len(numbers),
+		Bounds:      make([][2]float64, len(numbers)),
+		ProblemType: "subsetsum",
+		Metadata: map[string]interface{}{
+			"target_sum":   target,
+			"number_count": len(numbers),
+		},
+	}
+
+	// Set variable bounds [0, 1] for binary selection (include/exclude)
+	for i := 0; i < len(numbers); i++ {
+		srs.problemSpace.Bounds[i] = [2]float64{0, 1}
+	}
+
+	// Create subset sum constraint
+	constraint := &SubsetSumConstraint{
+		Numbers: numbers,
+		Target:  target,
+		Weight:  1.0,
+	}
+
+	srs.constraints = []Constraint{constraint}
+
+	return nil
 }
 
 // initializeParticles creates and initializes entropy particles
@@ -419,9 +505,16 @@ func (srs *SRSEngine) getAffectingConstraints(assignment []int) []int {
 func (srs *SRSEngine) evolveParticles() (*Solution, error) {
 	timeout := time.Duration(srs.config.TimeoutSeconds) * time.Second
 
+	fmt.Printf("[SRS] Starting evolution loop: max_iterations=%d, timeout=%v\n",
+		srs.config.MaxIterations, timeout)
+
 	for srs.currentIteration = 0; srs.currentIteration < srs.config.MaxIterations; srs.currentIteration++ {
+		iterStart := time.Now()
+
 		// Check timeout
 		if time.Since(srs.startTime) > timeout {
+			fmt.Printf("[SRS] Timeout reached at iteration %d after %v\n",
+				srs.currentIteration, time.Since(srs.startTime))
 			break
 		}
 
@@ -433,14 +526,26 @@ func (srs *SRSEngine) evolveParticles() (*Solution, error) {
 		// Record telemetry
 		srs.recordTelemetry()
 
+		// Log progress every 10 iterations
+		if srs.currentIteration%10 == 0 {
+			iterTime := time.Since(iterStart)
+			elapsed := time.Since(srs.startTime)
+			fmt.Printf("[SRS] Iteration %d: took %v, total elapsed %v\n",
+				srs.currentIteration, iterTime, elapsed)
+		}
+
 		// Check for solution
 		if solution := srs.checkForSolution(); solution != nil {
+			fmt.Printf("[SRS] Solution found at iteration %d after %v\n",
+				srs.currentIteration, time.Since(srs.startTime))
 			solution.ComputeTime = time.Since(srs.startTime).Seconds()
 			return solution, nil
 		}
 
 		// Check for convergence
 		if srs.checkConvergence() {
+			fmt.Printf("[SRS] Convergence detected at iteration %d after %v\n",
+				srs.currentIteration, time.Since(srs.startTime))
 			break
 		}
 	}
@@ -481,10 +586,12 @@ func (srs *SRSEngine) updateParticles() error {
 func (srs *SRSEngine) updateParticle(particle *EntropyParticle) error {
 	// Apply quantum evolution
 	dt := 0.01
-	if err := srs.resonanceEngine.EvolveStateWithResonance(
-		particle.QuantumState, dt, srs.config.QuantumFactor); err != nil {
+	evolvedState, err := srs.resonanceEngine.EvolveStateWithResonance(
+		particle.QuantumState, dt, srs.config.QuantumFactor)
+	if err != nil {
 		return fmt.Errorf("quantum evolution failed: %w", err)
 	}
+	particle.QuantumState = evolvedState
 
 	// Update particle metrics
 	srs.resonanceEngine.RecordEntropyPoint(particle.QuantumState, srs.currentIteration)
@@ -846,6 +953,39 @@ func (c *SATClause) GetWeight() float64 {
 // GetType implements the Constraint interface for SATClause
 func (c *SATClause) GetType() string {
 	return "sat_clause"
+}
+
+// Evaluate implements the Constraint interface for SubsetSumConstraint
+func (ssc *SubsetSumConstraint) Evaluate(assignment []int) bool {
+	sum := 0.0
+	for i, include := range assignment {
+		if include == 1 && i < len(ssc.Numbers) {
+			sum += ssc.Numbers[i]
+		}
+	}
+
+	// Allow small tolerance for floating point comparison
+	tolerance := 1e-6
+	return math.Abs(sum-ssc.Target) < tolerance
+}
+
+// GetVariables implements the Constraint interface for SubsetSumConstraint
+func (ssc *SubsetSumConstraint) GetVariables() []int {
+	variables := make([]int, len(ssc.Numbers))
+	for i := range variables {
+		variables[i] = i
+	}
+	return variables
+}
+
+// GetWeight implements the Constraint interface for SubsetSumConstraint
+func (ssc *SubsetSumConstraint) GetWeight() float64 {
+	return ssc.Weight
+}
+
+// GetType implements the Constraint interface for SubsetSumConstraint
+func (ssc *SubsetSumConstraint) GetType() string {
+	return "subset_sum"
 }
 
 // GetTelemetry returns current telemetry data

@@ -6,19 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/resonancelab/psizero/engines/iching"
+	"github.com/resonancelab/psizero/gateway/services"
 	"github.com/resonancelab/psizero/shared/types"
 )
-
-// Global I-Ching engine instance
-var globalIChingEngine *iching.IChingEngine
-
-func init() {
-	var err error
-	globalIChingEngine, err = iching.NewIChingEngine()
-	if err != nil {
-		panic("Failed to initialize I-Ching engine: " + err.Error())
-	}
-}
 
 // I-Ching API types
 type IChingRequest struct {
@@ -111,15 +101,25 @@ type IChingMetrics struct {
 	SymbolicResonance  float64 `json:"symbolicResonance"`
 }
 
-// SetupIChingRoutes configures I-Ching Oracle service routes
-func SetupIChingRoutes(rg *gin.RouterGroup) {
+// SetupIChingRoutes configures I-Ching Oracle service routes with dependency injection
+func SetupIChingRoutes(rg *gin.RouterGroup, container *services.ServiceContainer) {
 	iching := rg.Group("/iching")
 	{
-		iching.POST("/evolve", evolveHexagrams)
-		iching.GET("/hexagrams", getHexagramDatabase)
-		iching.GET("/hexagrams/:number", getHexagram)
-		iching.GET("/trigrams", getTrigrams)
-		iching.GET("/status", getIChingStatus)
+		iching.POST("/evolve", func(c *gin.Context) {
+			evolveHexagrams(c, container.GetIChingEngine())
+		})
+		iching.GET("/hexagrams", func(c *gin.Context) {
+			getHexagramDatabase(c, container.GetIChingEngine())
+		})
+		iching.GET("/hexagrams/:number", func(c *gin.Context) {
+			getHexagram(c, container.GetIChingEngine())
+		})
+		iching.GET("/trigrams", func(c *gin.Context) {
+			getTrigrams(c, container.GetIChingEngine())
+		})
+		iching.GET("/status", func(c *gin.Context) {
+			getIChingStatus(c, container.GetIChingEngine())
+		})
 	}
 }
 
@@ -137,7 +137,7 @@ func SetupIChingRoutes(rg *gin.RouterGroup) {
 // @Security ApiKeyAuth
 // @Security BearerAuth
 // @Router /v1/iching/evolve [post]
-func evolveHexagrams(c *gin.Context) {
+func evolveHexagrams(c *gin.Context, ichingEngine *iching.IChingEngine) {
 	requestID := c.GetString("request_id")
 	var req IChingRequest
 
@@ -220,7 +220,7 @@ func evolveHexagrams(c *gin.Context) {
 	}
 
 	// Perform actual I-Ching consultation
-	result, telemetry, err := globalIChingEngine.ConsultOracle(req.Question, req.Context, req.Querent, engineConfig)
+	result, telemetry, err := ichingEngine.ConsultOracle(req.Question, req.Context, req.Querent, engineConfig)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, types.NewAPIError(
 			"ICHING_003",
@@ -276,7 +276,7 @@ func evolveHexagrams(c *gin.Context) {
 // @Security ApiKeyAuth
 // @Security BearerAuth
 // @Router /v1/iching/hexagrams [get]
-func getHexagramDatabase(c *gin.Context) {
+func getHexagramDatabase(c *gin.Context, ichingEngine *iching.IChingEngine) {
 	requestID := c.GetString("request_id")
 
 	database := map[string]interface{}{
@@ -309,12 +309,12 @@ func getHexagramDatabase(c *gin.Context) {
 // @Security ApiKeyAuth
 // @Security BearerAuth
 // @Router /v1/iching/hexagrams/{number} [get]
-func getHexagram(c *gin.Context) {
+func getHexagram(c *gin.Context, ichingEngine *iching.IChingEngine) {
 	requestID := c.GetString("request_id")
 	number := c.Param("number")
 
 	// Mock hexagram retrieval (in real implementation, would fetch from database)
-	hexagram := getHexagramDetails("111111") // Mock - would use number to lookup
+	hexagram := getHexagramDetails(number) // Use the number parameter
 
 	if hexagram == nil {
 		c.JSON(http.StatusNotFound, types.NewAPIError(
@@ -338,7 +338,7 @@ func getHexagram(c *gin.Context) {
 // @Security ApiKeyAuth
 // @Security BearerAuth
 // @Router /v1/iching/trigrams [get]
-func getTrigrams(c *gin.Context) {
+func getTrigrams(c *gin.Context, ichingEngine *iching.IChingEngine) {
 	requestID := c.GetString("request_id")
 
 	trigrams := map[string]interface{}{

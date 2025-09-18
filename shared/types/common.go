@@ -26,12 +26,12 @@ type APIError struct {
 
 // TelemetryPoint represents a single telemetry data point
 type TelemetryPoint struct {
-	Step              int     `json:"t"`
-	SymbolicEntropy   float64 `json:"S"`
-	LyapunovMetric    float64 `json:"L"`
-	SatisfactionRate  float64 `json:"satRate"`
-	ResonanceStrength float64 `json:"resonanceStrength,omitempty"`
-	Dominance         float64 `json:"dominance,omitempty"`
+	Step              int       `json:"t"`
+	SymbolicEntropy   float64   `json:"S"`
+	LyapunovMetric    float64   `json:"L"`
+	SatisfactionRate  float64   `json:"satRate"`
+	ResonanceStrength float64   `json:"resonanceStrength,omitempty"`
+	Dominance         float64   `json:"dominance,omitempty"`
 	Timestamp         time.Time `json:"timestamp"`
 }
 
@@ -67,15 +67,15 @@ type WebhookEvent struct {
 
 // Config represents common service configuration
 type Config struct {
-	Port         int    `json:"port"`
-	DatabaseURL  string `json:"database_url"`
-	RedisURL     string `json:"redis_url"`
-	JWTSecret    string `json:"jwt_secret"`
-	LogLevel     string `json:"log_level"`
-	Environment  string `json:"environment"`
-	ServiceName  string `json:"service_name"`
-	MetricsPort  int    `json:"metrics_port"`
-	HealthPort   int    `json:"health_port"`
+	Port        int    `json:"port"`
+	DatabaseURL string `json:"database_url"`
+	RedisURL    string `json:"redis_url"`
+	JWTSecret   string `json:"jwt_secret"`
+	LogLevel    string `json:"log_level"`
+	Environment string `json:"environment"`
+	ServiceName string `json:"service_name"`
+	MetricsPort int    `json:"metrics_port"`
+	HealthPort  int    `json:"health_port"`
 }
 
 // NewRequestID generates a new request ID
@@ -105,4 +105,41 @@ func NewAPIError(code, message, details, requestID string) *APIResponse {
 		RequestID: requestID,
 		Timestamp: time.Now(),
 	}
+}
+
+// EngineState represents the state of a resonance engine
+type EngineState struct {
+	ID              string                 `json:"id"`
+	Type            string                 `json:"type"`
+	Status          string                 `json:"status"`
+	LastUpdate      time.Time              `json:"last_update"`
+	Metrics         map[string]interface{} `json:"metrics"`
+	Configuration   map[string]interface{} `json:"configuration"`
+	ResonanceLevel  float64                `json:"resonance_level"`
+	Coherence       float64                `json:"coherence"`
+	EntanglementMap map[string]interface{} `json:"entanglement_map"`
+}
+
+// GlobalResonanceState represents the global resonance state of the system
+type GlobalResonanceState struct {
+	GlobalResonance   float64                 `json:"global_resonance"`
+	SystemCoherence   float64                 `json:"system_coherence"`
+	UnificationDegree float64                 `json:"unification_degree"`
+	SyncTimestamp     time.Time               `json:"sync_timestamp"`
+	AggregatedMetrics map[string]interface{}  `json:"aggregated_metrics"`
+	GlobalConfig      map[string]interface{}  `json:"global_config"`
+	EngineStates      map[string]*EngineState `json:"engine_states"`
+	TelemetryHistory  []TelemetryPoint        `json:"telemetry_history"`
+	SharedPrimes      []int                   `json:"shared_primes"`
+}
+
+// PerformanceMetric represents a performance metric
+type PerformanceMetric struct {
+	Name         string      `json:"name"`
+	CurrentValue float64     `json:"current_value"`
+	MinValue     float64     `json:"min_value"`
+	MaxValue     float64     `json:"max_value"`
+	AverageValue float64     `json:"average_value"`
+	Values       []float64   `json:"values"`
+	Timestamps   []time.Time `json:"timestamps"`
 }

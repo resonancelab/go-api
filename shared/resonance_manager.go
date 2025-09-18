@@ -5,7 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/resonancelab/psizero/api/core"
+	"github.com/resonancelab/psizero/core"
+	"github.com/resonancelab/psizero/core/hilbert"
+	"github.com/resonancelab/psizero/core/operators"
 	"github.com/resonancelab/psizero/shared/types"
 )
 
@@ -68,7 +70,7 @@ type EngineState struct {
 	LastUpdate      time.Time              `json:"last_update"`
 	Metrics         map[string]float64     `json:"metrics"`
 	Configuration   map[string]interface{} `json:"configuration"`
-	QuantumState    *core.QuantumState     `json:"quantum_state,omitempty"`
+	QuantumState    *hilbert.QuantumState  `json:"quantum_state,omitempty"`
 	ResonanceLevel  float64                `json:"resonance_level"`
 	Coherence       float64                `json:"coherence"`
 	EntanglementMap map[string]float64     `json:"entanglement_map"`
@@ -82,16 +84,16 @@ type GlobalResonanceState struct {
 	UnificationDegree float64 `json:"unification_degree"`
 
 	// Quantum state
-	MasterQuantumState *core.QuantumState `json:"master_quantum_state"`
-	EntanglementMatrix [][]complex128     `json:"entanglement_matrix"`
+	MasterQuantumState *hilbert.QuantumState `json:"master_quantum_state"`
+	EntanglementMatrix [][]complex128        `json:"entanglement_matrix"`
 
 	// Engine synchronization
 	EngineStates  map[string]*EngineState `json:"engine_states"`
 	SyncTimestamp time.Time               `json:"sync_timestamp"`
 
 	// Shared resources
-	SharedPrimes       []int                     `json:"shared_primes"`
-	ResonanceOperators []*core.ResonanceOperator `json:"resonance_operators"`
+	SharedPrimes       []int                          `json:"shared_primes"`
+	ResonanceOperators []*operators.ResonanceOperator `json:"resonance_operators"`
 
 	// Telemetry aggregation
 	AggregatedMetrics map[string]float64     `json:"aggregated_metrics"`
@@ -130,12 +132,14 @@ type ResonanceManagerConfig struct {
 // NewResonanceManager creates a new resonance manager
 func NewResonanceManager(config *ResonanceManagerConfig) (*ResonanceManager, error) {
 	// Create core resonance engine
-	coreConfig := &core.ResonanceEngineConfig{
-		Dimension:         1024,
-		MaxPrimes:         10000,
-		TimeoutSeconds:    30,
-		EvolutionSteps:    1000,
-		ResonanceStrength: 1.0,
+	coreConfig := &core.EngineConfig{
+		Dimension:        1024,
+		MaxPrimeLimit:    10000,
+		InitialEntropy:   1.5,
+		EntropyLambda:    0.02,
+		PlateauTolerance: 1e-6,
+		PlateauWindow:    10,
+		HistorySize:      10000,
 	}
 
 	resonanceEngine, err := core.NewResonanceEngine(coreConfig)
@@ -149,8 +153,8 @@ func NewResonanceManager(config *ResonanceManagerConfig) (*ResonanceManager, err
 		SystemCoherence:    1.0,
 		UnificationDegree:  0.0,
 		EngineStates:       make(map[string]*EngineState),
-		SharedPrimes:       resonanceEngine.GetPrimes().GetFirst(100),
-		ResonanceOperators: make([]*core.ResonanceOperator, 0),
+		SharedPrimes:       resonanceEngine.GetPrimeEngine().GetPrimeBasis(100),
+		ResonanceOperators: make([]*operators.ResonanceOperator, 0),
 		AggregatedMetrics:  make(map[string]float64),
 		TelemetryHistory:   make([]types.TelemetryPoint, 0),
 		GlobalConfig:       make(map[string]interface{}),
@@ -233,7 +237,12 @@ func (rm *ResonanceManager) Stop() error {
 		return nil
 	}
 
-	// Signal shutdown
+	// Signal shutdown - safely handle already closed channel
+	defer func() {
+		if r := recover(); r != nil {
+			// Channel already closed
+		}
+	}()
 	close(rm.shutdown)
 
 	// Cleanup engines

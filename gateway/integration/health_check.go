@@ -140,7 +140,7 @@ func (hc *IntegrationHealthChecker) checkSRSEngine() HealthCheckResult {
 		result.Error = fmt.Sprintf("SRS test failed: %v", err)
 	} else {
 		result.Status = "healthy"
-		result.Details["test_solution"] = solution.Success
+		result.Details["test_solution"] = solution.Feasible
 		result.Details["feasible"] = solution.Feasible
 	}
 
@@ -182,7 +182,7 @@ func (hc *IntegrationHealthChecker) checkHQEEngine() HealthCheckResult {
 		result.Error = fmt.Sprintf("HQE test failed: %v", err)
 	} else {
 		result.Status = "healthy"
-		result.Details["simulation_success"] = simulation.Success
+		result.Details["simulation_success"] = simulation.Converged
 		result.Details["converged"] = simulation.Converged
 	}
 

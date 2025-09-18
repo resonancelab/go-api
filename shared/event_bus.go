@@ -43,13 +43,13 @@ func NewEventBus() *EventBus {
 func (eb *EventBus) Start() {
 	eb.runMutex.Lock()
 	defer eb.runMutex.Unlock()
-	
+
 	if eb.running {
 		return
 	}
-	
+
 	eb.running = true
-	
+
 	// Start worker goroutines
 	for i := 0; i < eb.workers; i++ {
 		go eb.worker()
@@ -60,18 +60,24 @@ func (eb *EventBus) Start() {
 func (eb *EventBus) Stop() {
 	eb.runMutex.Lock()
 	defer eb.runMutex.Unlock()
-	
+
 	if !eb.running {
 		return
 	}
-	
+
 	eb.running = false
-	
+
 	// Stop all workers
 	for i := 0; i < eb.workers; i++ {
 		eb.stopWorkers <- true
 	}
-	
+
+	// Close event queue safely
+	defer func() {
+		if r := recover(); r != nil {
+			// Channel already closed
+		}
+	}()
 	close(eb.eventQueue)
 }
 
@@ -79,11 +85,11 @@ func (eb *EventBus) Stop() {
 func (eb *EventBus) Subscribe(eventType string, handler EventHandler) {
 	eb.mutex.Lock()
 	defer eb.mutex.Unlock()
-	
+
 	if eb.subscribers[eventType] == nil {
 		eb.subscribers[eventType] = make([]EventHandler, 0)
 	}
-	
+
 	eb.subscribers[eventType] = append(eb.subscribers[eventType], handler)
 }
 
@@ -91,23 +97,37 @@ func (eb *EventBus) Subscribe(eventType string, handler EventHandler) {
 func (eb *EventBus) Unsubscribe(eventType string) {
 	eb.mutex.Lock()
 	defer eb.mutex.Unlock()
-	
+
 	delete(eb.subscribers, eventType)
 }
 
 // Publish publishes an event
 func (eb *EventBus) Publish(event Event) {
+	eb.runMutex.Lock()
+	running := eb.running
+	eb.runMutex.Unlock()
+
+	if !running {
+		return // Don't publish if event bus is stopped
+	}
+
 	// Set timestamp if not set
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now()
 	}
-	
+
 	// Generate ID if not set
 	if event.ID == "" {
 		event.ID = eb.generateEventID()
 	}
-	
-	// Add to queue
+
+	// Add to queue - safely handle closed channel
+	defer func() {
+		if r := recover(); r != nil {
+			// Channel is closed, silently drop event
+		}
+	}()
+
 	select {
 	case eb.eventQueue <- event:
 		// Event queued successfully
@@ -118,16 +138,24 @@ func (eb *EventBus) Publish(event Event) {
 
 // PublishSync publishes an event synchronously
 func (eb *EventBus) PublishSync(event Event) {
+	eb.runMutex.Lock()
+	running := eb.running
+	eb.runMutex.Unlock()
+
+	if !running {
+		return // Don't publish if event bus is stopped
+	}
+
 	// Set timestamp if not set
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now()
 	}
-	
+
 	// Generate ID if not set
 	if event.ID == "" {
 		event.ID = eb.generateEventID()
 	}
-	
+
 	// Handle immediately
 	eb.handleEvent(event)
 }
@@ -148,17 +176,17 @@ func (eb *EventBus) worker() {
 func (eb *EventBus) handleEvent(event Event) {
 	eb.mutex.RLock()
 	handlers := eb.subscribers[event.Type]
-	
+
 	// Also check for wildcard subscribers
 	wildcardHandlers := eb.subscribers["*"]
-	
+
 	// Combine handlers
 	allHandlers := make([]EventHandler, 0, len(handlers)+len(wildcardHandlers))
 	allHandlers = append(allHandlers, handlers...)
 	allHandlers = append(allHandlers, wildcardHandlers...)
-	
+
 	eb.mutex.RUnlock()
-	
+
 	// Execute handlers
 	for _, handler := range allHandlers {
 		// Execute in goroutine to prevent blocking
@@ -192,7 +220,7 @@ func randString(length int) string {
 func (eb *EventBus) GetSubscriberCount(eventType string) int {
 	eb.mutex.RLock()
 	defer eb.mutex.RUnlock()
-	
+
 	return len(eb.subscribers[eventType])
 }
 
@@ -200,12 +228,12 @@ func (eb *EventBus) GetSubscriberCount(eventType string) int {
 func (eb *EventBus) GetTotalSubscribers() int {
 	eb.mutex.RLock()
 	defer eb.mutex.RUnlock()
-	
+
 	total := 0
 	for _, handlers := range eb.subscribers {
 		total += len(handlers)
 	}
-	
+
 	return total
 }
 
@@ -213,12 +241,12 @@ func (eb *EventBus) GetTotalSubscribers() int {
 func (eb *EventBus) GetEventTypes() []string {
 	eb.mutex.RLock()
 	defer eb.mutex.RUnlock()
-	
+
 	types := make([]string, 0, len(eb.subscribers))
 	for eventType := range eb.subscribers {
 		types = append(types, eventType)
 	}
-	
+
 	return types
 }
 

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -79,7 +80,10 @@ func solveProblem(c *gin.Context, srsEngine *srs.SRSEngine) {
 	requestID := c.GetString("request_id")
 	var req SRSRequest
 
+	fmt.Printf("[SRS Router] Received solve request for request_id: %s\n", requestID)
+
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("[SRS Router] JSON binding failed: %v\n", err)
 		c.JSON(http.StatusBadRequest, types.NewAPIError(
 			"SRS_001",
 			"Invalid request format",
@@ -89,11 +93,15 @@ func solveProblem(c *gin.Context, srsEngine *srs.SRSEngine) {
 		return
 	}
 
+	fmt.Printf("[SRS Router] Successfully bound request: problem=%s, config=%+v\n", req.Problem, req.Config)
+
 	// Convert API config to SRS engine config
 	engineConfig := convertToSRSConfig(req.Config)
 
 	// Solve the problem using the actual SRS engine
 	startTime := time.Now()
+
+	fmt.Printf("[SRS Router] Starting problem solving with engine config: %+v\n", engineConfig)
 
 	solution, telemetry, err := srsEngine.SolveProblem(req.Problem, req.Spec, engineConfig)
 	if err != nil {

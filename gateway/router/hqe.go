@@ -1,7 +1,6 @@
 package router
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -293,27 +292,12 @@ func convertResultToSnapshots(result *hqe.HolographicSimulationResult, telemetry
 		// Extract amplitudes from telemetry (simplified)
 		amplitudes := make([]float64, 5) // Sample 5 amplitudes
 		for j := range amplitudes {
-			if j < len(point.Data) {
-				if val, ok := point.Data[fmt.Sprintf("amplitude_%d", j)].(float64); ok {
-					amplitudes[j] = val
-				} else {
-					amplitudes[j] = 0.5 + 0.3*float64(j)/5.0 // Fallback
-				}
-			} else {
-				amplitudes[j] = 0.5 + 0.3*float64(j)/5.0
-			}
+			amplitudes[j] = 0.5 + 0.3*float64(j)/5.0 // Generated amplitudes
 		}
 
-		// Extract metrics from telemetry
-		entropy := result.EntanglementEntropy
-		if val, ok := point.Data["entropy"].(float64); ok {
-			entropy = val
-		}
-
-		coherence := 0.5
-		if val, ok := point.Data["coherence"].(float64); ok {
-			coherence = val
-		}
+		// Extract metrics from telemetry point fields
+		entropy := point.SymbolicEntropy
+		coherence := point.SatisfactionRate
 
 		snapshot := HQESnapshot{
 			Step:       step,

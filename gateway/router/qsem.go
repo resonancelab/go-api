@@ -1,7 +1,7 @@
 package router
 
 import (
-	"fmt"
+	"math"
 	"net/http"
 	"time"
 
@@ -24,20 +24,20 @@ type QSEMResonanceRequest struct {
 }
 
 type QSEMConfig struct {
-	SemanticDimensions    int     `json:"semantic_dimensions,omitempty" example:"300"`
-	MaxConcepts           int     `json:"max_concepts,omitempty" example:"10000"`
-	PrimeBasisSize        int     `json:"prime_basis_size,omitempty" example:"100"`
-	ContextDepth          int     `json:"context_depth,omitempty" example:"5"`
-	LearningRate          float64 `json:"learning_rate,omitempty" example:"0.01"`
-	CoherenceThreshold    float64 `json:"coherence_threshold,omitempty" example:"0.7"`
-	ActivationThreshold   float64 `json:"activation_threshold,omitempty" example:"0.5"`
-	SemanticRadius        float64 `json:"semantic_radius,omitempty" example:"2.0"`
-	ClusteringThreshold   float64 `json:"clustering_threshold,omitempty" example:"0.8"`
-	MaxIterations         int     `json:"max_iterations,omitempty" example:"1000"`
-	TimeoutSeconds        int     `json:"timeout_seconds,omitempty" example:"300"`
-	MaxDimensions         int     `json:"max_dimensions,omitempty" example:"100"` // Backward compatibility
-	Threshold             float64 `json:"threshold,omitempty" example:"0.1"`      // Backward compatibility
-	Normalize             bool    `json:"normalize,omitempty"`                    // Backward compatibility
+	SemanticDimensions  int     `json:"semantic_dimensions,omitempty" example:"300"`
+	MaxConcepts         int     `json:"max_concepts,omitempty" example:"10000"`
+	PrimeBasisSize      int     `json:"prime_basis_size,omitempty" example:"100"`
+	ContextDepth        int     `json:"context_depth,omitempty" example:"5"`
+	LearningRate        float64 `json:"learning_rate,omitempty" example:"0.01"`
+	CoherenceThreshold  float64 `json:"coherence_threshold,omitempty" example:"0.7"`
+	ActivationThreshold float64 `json:"activation_threshold,omitempty" example:"0.5"`
+	SemanticRadius      float64 `json:"semantic_radius,omitempty" example:"2.0"`
+	ClusteringThreshold float64 `json:"clustering_threshold,omitempty" example:"0.8"`
+	MaxIterations       int     `json:"max_iterations,omitempty" example:"1000"`
+	TimeoutSeconds      int     `json:"timeout_seconds,omitempty" example:"300"`
+	MaxDimensions       int     `json:"max_dimensions,omitempty" example:"100"` // Backward compatibility
+	Threshold           float64 `json:"threshold,omitempty" example:"0.1"`      // Backward compatibility
+	Normalize           bool    `json:"normalize,omitempty"`                    // Backward compatibility
 }
 
 type QuantumVector struct {
@@ -79,18 +79,18 @@ type ResonancePair struct {
 }
 
 type ResonanceAnalysis struct {
-	StrongestPair    *ResonancePair `json:"strongestPair"`
-	WeakestPair      *ResonancePair `json:"weakestPair"`
-	AvgResonance     float64        `json:"avgResonance"`
-	ClusterCount     int            `json:"clusterCount"`
-	SemanticGroups   []SemanticGroup `json:"semanticGroups,omitempty"`
+	StrongestPair  *ResonancePair  `json:"strongestPair"`
+	WeakestPair    *ResonancePair  `json:"weakestPair"`
+	AvgResonance   float64         `json:"avgResonance"`
+	ClusterCount   int             `json:"clusterCount"`
+	SemanticGroups []SemanticGroup `json:"semanticGroups,omitempty"`
 }
 
 type SemanticGroup struct {
-	Concepts   []string `json:"concepts"`
-	Centroid   []float64 `json:"centroid"`
-	Coherence  float64   `json:"coherence"`
-	Label      string    `json:"label,omitempty"`
+	Concepts  []string  `json:"concepts"`
+	Centroid  []float64 `json:"centroid"`
+	Coherence float64   `json:"coherence"`
+	Label     string    `json:"label,omitempty"`
 }
 
 // SetupQSEMRoutes configures QSEM service routes with dependency injection
@@ -129,7 +129,7 @@ func SetupQSEMRoutes(rg *gin.RouterGroup, container *services.ServiceContainer) 
 func encodeConcepts(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 	requestID := c.GetString("request_id")
 	var req QSEMEncodeRequest
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.NewAPIError(
 			"QSEM_001",
@@ -151,7 +151,7 @@ func encodeConcepts(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 	}
 
 	startTime := time.Now()
-	
+
 	// Convert API config to engine config
 	var engineConfig *qsem.QSEMConfig
 	if req.Config != nil {
@@ -168,7 +168,7 @@ func encodeConcepts(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 			MaxIterations:       req.Config.MaxIterations,
 			TimeoutSeconds:      req.Config.TimeoutSeconds,
 		}
-		
+
 		// Set defaults for missing values
 		if engineConfig.SemanticDimensions == 0 {
 			engineConfig.SemanticDimensions = 300
@@ -210,7 +210,7 @@ func encodeConcepts(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 		"type":     "concepts",
 		"concepts": make([]interface{}, len(req.Concepts)),
 	}
-	
+
 	for i, concept := range req.Concepts {
 		input["concepts"].([]interface{})[i] = concept
 	}
@@ -226,7 +226,7 @@ func encodeConcepts(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 		))
 		return
 	}
-	
+
 	endTime := time.Now()
 	duration := float64(endTime.Sub(startTime).Nanoseconds()) / 1e6
 
@@ -239,10 +239,15 @@ func encodeConcepts(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 		Vectors:   vectors,
 		Basis:     "prime",
 		Stats: &EncodingStats{
-			TotalConcepts:    len(req.Concepts),
-			VectorDimensions: result.ConceptMap != nil && len(result.ConceptMap) > 0 ? 300 : 20,
-			AvgMagnitude:     calculateAverageVectorMagnitude(vectors),
-			Sparsity:         result.MeaningDensity,
+			TotalConcepts: len(req.Concepts),
+			VectorDimensions: func() int {
+				if result.ConceptMap != nil && len(result.ConceptMap) > 0 {
+					return 300
+				}
+				return 20
+			}(),
+			AvgMagnitude: calculateAverageVectorMagnitude(vectors),
+			Sparsity:     result.MeaningDensity,
 		},
 		Timing: &TimingInfo{
 			StartTime:  startTime,
@@ -272,7 +277,7 @@ func encodeConcepts(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 func computeResonance(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 	requestID := c.GetString("request_id")
 	var req QSEMResonanceRequest
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.NewAPIError(
 			"QSEM_003",
@@ -294,7 +299,7 @@ func computeResonance(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 	}
 
 	startTime := time.Now()
-	
+
 	// Convert API config to engine config
 	var engineConfig *qsem.QSEMConfig
 	if req.Config != nil {
@@ -311,7 +316,7 @@ func computeResonance(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 			MaxIterations:       req.Config.MaxIterations,
 			TimeoutSeconds:      req.Config.TimeoutSeconds,
 		}
-		
+
 		// Set defaults for missing values (same as above)
 		if engineConfig.SemanticDimensions == 0 {
 			engineConfig.SemanticDimensions = 300
@@ -359,7 +364,7 @@ func computeResonance(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 		"type":     "concepts",
 		"concepts": make([]interface{}, len(concepts)),
 	}
-	
+
 	for i, concept := range concepts {
 		input["concepts"].([]interface{})[i] = concept
 	}
@@ -375,7 +380,7 @@ func computeResonance(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 		))
 		return
 	}
-	
+
 	endTime := time.Now()
 	duration := float64(endTime.Sub(startTime).Nanoseconds()) / 1e6
 
@@ -411,7 +416,7 @@ func computeResonance(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 // @Router /v1/qsem/basis [get]
 func getSupportedBasis(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 	requestID := c.GetString("request_id")
-	
+
 	basisInfo := map[string]interface{}{
 		"supported": []string{"prime", "fourier", "wavelet"},
 		"default":   "prime",
@@ -446,7 +451,7 @@ func getSupportedBasis(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 // @Router /v1/qsem/status [get]
 func getQSEMStatus(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 	requestID := c.GetString("request_id")
-	
+
 	status := map[string]interface{}{
 		"service":           "qsem",
 		"status":            "operational",
@@ -463,11 +468,11 @@ func getQSEMStatus(c *gin.Context, qsemEngine *qsem.QSEMEngine) {
 // convertSemanticResultToVectors converts QSEM result to API vector format
 func convertSemanticResultToVectors(result *qsem.SemanticAnalysisResult, concepts []string) []QuantumVector {
 	vectors := make([]QuantumVector, len(concepts))
-	
+
 	for i, concept := range concepts {
 		// Create quantum vector from semantic analysis result
 		alpha := make([]float64, 10) // Sample 10 dimensions
-		
+
 		if result.ConceptMap != nil {
 			if semanticVector, exists := result.ConceptMap[concept]; exists && semanticVector != nil {
 				// Extract real amplitudes from quantum state
@@ -491,20 +496,20 @@ func convertSemanticResultToVectors(result *qsem.SemanticAnalysisResult, concept
 				}
 			}
 		}
-		
+
 		// Fill remaining with default values if needed
 		for j := range alpha {
 			if alpha[j] == 0 {
 				alpha[j] = 0.1 + 0.05*float64(j)/float64(len(alpha))
 			}
 		}
-		
+
 		vectors[i] = QuantumVector{
 			Concept: concept,
 			Alpha:   alpha,
 		}
 	}
-	
+
 	return vectors
 }
 
@@ -513,12 +518,12 @@ func convertSemanticResultToResonance(result *qsem.SemanticAnalysisResult, vecto
 	n := len(vectors)
 	matrix := make([][]float64, n)
 	pairwise := make([]ResonancePair, 0, n*(n-1)/2)
-	
+
 	totalResonance := 0.0
 	strongestPair := &ResonancePair{Resonance: -1}
 	weakestPair := &ResonancePair{Resonance: 2}
 	pairCount := 0
-	
+
 	for i := 0; i < n; i++ {
 		matrix[i] = make([]float64, n)
 		for j := i; j < n; j++ {
@@ -530,7 +535,7 @@ func convertSemanticResultToResonance(result *qsem.SemanticAnalysisResult, vecto
 				if result.SemanticSimilarity != nil {
 					concept1 := vectors[i].Concept
 					concept2 := vectors[j].Concept
-					
+
 					if similarities, exists := result.SemanticSimilarity[concept1]; exists {
 						if similarity, found := similarities[concept2]; found {
 							resonance = similarity
@@ -543,7 +548,7 @@ func convertSemanticResultToResonance(result *qsem.SemanticAnalysisResult, vecto
 				} else {
 					resonance = calculateVectorResonance(vectors[i], vectors[j])
 				}
-				
+
 				// Determine resonance type
 				resonanceType := "neutral"
 				if resonance > 0.7 {
@@ -551,7 +556,7 @@ func convertSemanticResultToResonance(result *qsem.SemanticAnalysisResult, vecto
 				} else if resonance < 0.3 {
 					resonanceType = "orthogonal"
 				}
-				
+
 				pair := ResonancePair{
 					A:         i,
 					B:         j,
@@ -559,28 +564,28 @@ func convertSemanticResultToResonance(result *qsem.SemanticAnalysisResult, vecto
 					Type:      resonanceType,
 				}
 				pairwise = append(pairwise, pair)
-				
+
 				if resonance > strongestPair.Resonance {
 					strongestPair = &pair
 				}
 				if resonance < weakestPair.Resonance {
 					weakestPair = &pair
 				}
-				
+
 				totalResonance += resonance
 				pairCount++
 			}
-			
+
 			matrix[i][j] = resonance
 			matrix[j][i] = resonance
 		}
 	}
-	
+
 	avgResonance := 0.0
 	if pairCount > 0 {
 		avgResonance = totalResonance / float64(pairCount)
 	}
-	
+
 	// Get cluster count from result
 	clusterCount := 1
 	if result.ClusterAssignments != nil {
@@ -590,14 +595,14 @@ func convertSemanticResultToResonance(result *qsem.SemanticAnalysisResult, vecto
 		}
 		clusterCount = len(clusters)
 	}
-	
+
 	analysis := &ResonanceAnalysis{
 		StrongestPair: strongestPair,
 		WeakestPair:   weakestPair,
 		AvgResonance:  avgResonance,
 		ClusterCount:  clusterCount,
 	}
-	
+
 	return pairwise, matrix, analysis
 }
 
@@ -606,18 +611,38 @@ func calculateVectorResonance(v1, v2 QuantumVector) float64 {
 	if len(v1.Alpha) != len(v2.Alpha) {
 		return 0.0
 	}
-	
-	// Compute dot product
+
+	if len(v1.Alpha) == 0 {
+		return 0.0
+	}
+
+	// Compute normalized dot product (cosine similarity)
 	dotProduct := 0.0
+	norm1 := 0.0
+	norm2 := 0.0
+
 	for i := range v1.Alpha {
 		dotProduct += v1.Alpha[i] * v2.Alpha[i]
+		norm1 += v1.Alpha[i] * v1.Alpha[i]
+		norm2 += v2.Alpha[i] * v2.Alpha[i]
 	}
-	
-	// Return absolute value as resonance strength
-	if dotProduct < 0 {
-		return -dotProduct
+
+	if norm1 == 0.0 || norm2 == 0.0 {
+		return 0.0
 	}
-	return dotProduct
+
+	// Return cosine similarity as resonance strength
+	cosineSimilarity := dotProduct / (math.Sqrt(norm1) * math.Sqrt(norm2))
+
+	// Ensure result is in [0, 1] range
+	if cosineSimilarity < 0 {
+		return 0.0
+	}
+	if cosineSimilarity > 1 {
+		return 1.0
+	}
+
+	return cosineSimilarity
 }
 
 // calculateAverageVectorMagnitude computes average magnitude of vectors
@@ -625,7 +650,7 @@ func calculateAverageVectorMagnitude(vectors []QuantumVector) float64 {
 	if len(vectors) == 0 {
 		return 0.0
 	}
-	
+
 	totalMagnitude := 0.0
 	for _, vector := range vectors {
 		magnitude := 0.0
@@ -634,6 +659,6 @@ func calculateAverageVectorMagnitude(vectors []QuantumVector) float64 {
 		}
 		totalMagnitude += magnitude
 	}
-	
+
 	return totalMagnitude / float64(len(vectors))
 }

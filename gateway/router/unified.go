@@ -132,13 +132,13 @@ func SetupUnifiedRoutes(rg *gin.RouterGroup, container *services.ServiceContaine
 			analyzeField(c, container.GetUnifiedEngine())
 		})
 		unified.GET("/constants", func(c *gin.Context) {
-			getPhysicalConstants(c, container.GetUnifiedEngine())
+			getPhysicalConstants(c)
 		})
 		unified.GET("/models", func(c *gin.Context) {
-			getSupportedModels(c, container.GetUnifiedEngine())
+			getSupportedModels(c)
 		})
 		unified.GET("/status", func(c *gin.Context) {
-			getUnifiedStatus(c, container.GetUnifiedEngine())
+			getUnifiedStatus(c)
 		})
 	}
 }

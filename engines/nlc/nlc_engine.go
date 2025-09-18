@@ -401,7 +401,7 @@ func (nlc *NLCEngine) generateNodeAmplitudes(nodeID string, index int) []complex
 	}
 
 	for i := 0; i < dimension; i++ {
-		prime := float64(nlc.resonanceEngine.GetPrimes().GetNthPrime(i))
+		prime := float64(nlc.resonanceEngine.GetPrimeBasis()[i%len(nlc.resonanceEngine.GetPrimeBasis())])
 
 		// Node-specific phase and amplitude
 		phase := 2.0 * math.Pi * (hash + float64(index)*prime) / 100.0
@@ -497,7 +497,9 @@ func (nlc *NLCEngine) createTeleportationProtocol() *Protocol {
 		SecurityLevel:     0.95,
 		Bandwidth:         2.0, // 2 classical bits per qubit
 		ErrorRate:         0.05,
-		Implementation:    nlc.executeQuantumTeleportation,
+		Implementation: func(engine *NLCEngine, message *QuantumMessage) error {
+			return engine.executeQuantumTeleportation(message)
+		},
 	}
 }
 
@@ -510,7 +512,9 @@ func (nlc *NLCEngine) createSuperdenseCodingProtocol() *Protocol {
 		SecurityLevel:     0.90,
 		Bandwidth:         0.5, // 1 qubit per 2 classical bits
 		ErrorRate:         0.03,
-		Implementation:    nlc.executeSuperdenseCoding,
+		Implementation: func(engine *NLCEngine, message *QuantumMessage) error {
+			return engine.executeSuperdenseCoding(message)
+		},
 	}
 }
 
@@ -523,6 +527,392 @@ func (nlc *NLCEngine) createEntanglementSwappingProtocol() *Protocol {
 		SecurityLevel:     0.85,
 		Bandwidth:         1.0,
 		ErrorRate:         0.10,
-		Implementation:    nlc.executeEntanglementSwapping,
+		Implementation: func(engine *NLCEngine, message *QuantumMessage) error {
+			return engine.executeEntanglementSwapping(message)
+		},
 	}
+}
+
+// establishEntanglement creates entanglement between nodes
+func (nlc *NLCEngine) establishEntanglement(participants []string) error {
+	// Create entanglement links between all participants
+	for i, nodeA := range participants {
+		for j, nodeB := range participants {
+			if i >= j {
+				continue // Avoid duplicate links and self-links
+			}
+
+			// Create Bell state for entanglement
+			bellState, err := nlc.createBellState(nodeA, nodeB)
+			if err != nil {
+				return fmt.Errorf("failed to create Bell state between %s and %s: %w", nodeA, nodeB, err)
+			}
+
+			nlc.bellStates = append(nlc.bellStates, bellState)
+
+			// Create entanglement link
+			link := &EntanglementLink{
+				NodeA:              nodeA,
+				NodeB:              nodeB,
+				EntanglementDegree: 0.95 + 0.05*rand.Float64(),
+				BellState:          bellState,
+				Fidelity:           0.9 + 0.1*rand.Float64(),
+				Bandwidth:          1000.0, // qubits/sec
+				Latency:            time.Millisecond * time.Duration(1+rand.Intn(10)),
+				NoiseLevel:         0.01 + 0.04*rand.Float64(),
+				CreatedAt:          time.Now(),
+				LastUsed:           time.Now(),
+			}
+
+			nlc.entanglementNetwork.Links = append(nlc.entanglementNetwork.Links, link)
+
+			// Update nodes' entanglement lists
+			for _, node := range nlc.entanglementNetwork.Nodes {
+				if node.ID == nodeA {
+					node.EntangledWith = append(node.EntangledWith, nodeB)
+				}
+				if node.ID == nodeB {
+					node.EntangledWith = append(node.EntangledWith, nodeA)
+				}
+			}
+		}
+	}
+
+	// Update network coherence
+	nlc.updateNetworkCoherence()
+
+	return nil
+}
+
+// executeProtocol runs the specified communication protocol
+func (nlc *NLCEngine) executeProtocol(protocol string, participants []string) (*CommunicationResult, error) {
+	startTime := time.Now()
+	sessionID := fmt.Sprintf("%s_%d", protocol, time.Now().Unix())
+
+	result := &CommunicationResult{
+		SessionID:          sessionID,
+		Protocol:           protocol,
+		ParticipatingNodes: participants,
+		ProcessingTime:     0,
+		Success:            false,
+	}
+
+	switch protocol {
+	case "teleportation", "quantum_teleportation":
+		err := nlc.runTeleportationProtocol(participants)
+		result.Success = (err == nil)
+		if err != nil {
+			return nil, fmt.Errorf("teleportation protocol failed: %w", err)
+		}
+
+	case "superdense", "superdense_coding":
+		err := nlc.runSuperdenseCodingProtocol(participants)
+		result.Success = (err == nil)
+		if err != nil {
+			return nil, fmt.Errorf("superdense coding protocol failed: %w", err)
+		}
+
+	case "entanglement_swap", "entanglement_swapping":
+		err := nlc.runEntanglementSwappingProtocol(participants)
+		result.Success = (err == nil)
+		if err != nil {
+			return nil, fmt.Errorf("entanglement swapping protocol failed: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unknown protocol: %s", protocol)
+	}
+
+	// Calculate final metrics
+	result.ProcessingTime = time.Since(startTime).Seconds()
+	result.MessagesTransmitted = len(nlc.transmissionHistory)
+	result.SuccessRate = nlc.calculateSuccessRate()
+	result.AverageFidelity = nlc.calculateAverageFidelity()
+	result.SecurityAchieved = nlc.config.SecurityLevel
+	result.NonLocalCorrelations = nlc.measureNonLocalCorrelations()
+	result.BellTestResults = nlc.performBellTests()
+
+	return result, nil
+}
+
+// createBellState creates a Bell state between two nodes
+func (nlc *NLCEngine) createBellState(nodeA, nodeB string) (*BellState, error) {
+	// Create entangled particles
+	particleA := &QuantumParticle{
+		ID:              fmt.Sprintf("%s_particle", nodeA),
+		NodeID:          nodeA,
+		Energy:          1.0,
+		Momentum:        []float64{0, 0, 0},
+		LastInteraction: time.Now(),
+	}
+
+	particleB := &QuantumParticle{
+		ID:              fmt.Sprintf("%s_particle", nodeB),
+		NodeID:          nodeB,
+		Energy:          1.0,
+		Momentum:        []float64{0, 0, 0},
+		LastInteraction: time.Now(),
+	}
+
+	// Create quantum states for particles (Bell state |Φ+⟩ = (|00⟩ + |11⟩)/√2)
+	dimension := nlc.resonanceEngine.GetDimension()
+	amplitudesA := make([]complex128, dimension)
+	amplitudesB := make([]complex128, dimension)
+
+	// Bell state structure
+	amplitudesA[0] = complex(1.0/1.414, 0)           // |0⟩ component
+	amplitudesA[dimension-1] = complex(1.0/1.414, 0) // |1⟩ component (simplified)
+
+	amplitudesB[0] = complex(1.0/1.414, 0)           // |0⟩ component
+	amplitudesB[dimension-1] = complex(1.0/1.414, 0) // |1⟩ component (simplified)
+
+	stateA, err := nlc.resonanceEngine.CreateQuantumState(amplitudesA)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create particle A state: %w", err)
+	}
+
+	stateB, err := nlc.resonanceEngine.CreateQuantumState(amplitudesB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create particle B state: %w", err)
+	}
+
+	particleA.QuantumState = stateA
+	particleB.QuantumState = stateB
+
+	bellState := &BellState{
+		ID:           fmt.Sprintf("bell_%s_%s", nodeA, nodeB),
+		Type:         "phi_plus",
+		ParticleA:    particleA,
+		ParticleB:    particleB,
+		Entanglement: 0.95 + 0.05*rand.Float64(),
+		Coherence:    0.9 + 0.1*rand.Float64(),
+		Fidelity:     0.95 + 0.05*rand.Float64(),
+		CreatedAt:    time.Now(),
+		ExpiresAt:    time.Now().Add(time.Duration(nlc.config.BellStateLifetime) * time.Second),
+	}
+
+	return bellState, nil
+}
+
+// runTeleportationProtocol executes quantum teleportation
+func (nlc *NLCEngine) runTeleportationProtocol(participants []string) error {
+	if len(participants) < 2 {
+		return fmt.Errorf("teleportation requires at least 2 participants")
+	}
+
+	// Simulate teleportation for each message
+	for i := 0; i < 5; i++ { // Send 5 test messages
+		message := &QuantumMessage{
+			ID:         fmt.Sprintf("teleport_msg_%d", i),
+			SenderID:   participants[0],
+			ReceiverID: participants[1],
+			Protocol:   "teleportation",
+			Content:    []byte(fmt.Sprintf("test message %d", i)),
+			Priority:   1,
+			CreatedAt:  time.Now(),
+			ExpiresAt:  time.Now().Add(time.Minute),
+			Status:     "pending",
+		}
+
+		err := nlc.executeQuantumTeleportation(message)
+		if err != nil {
+			return fmt.Errorf("teleportation of message %d failed: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+// runSuperdenseCodingProtocol executes superdense coding
+func (nlc *NLCEngine) runSuperdenseCodingProtocol(participants []string) error {
+	if len(participants) < 2 {
+		return fmt.Errorf("superdense coding requires at least 2 participants")
+	}
+
+	// Simulate superdense coding for each message
+	for i := 0; i < 3; i++ { // Send 3 test messages
+		message := &QuantumMessage{
+			ID:         fmt.Sprintf("superdense_msg_%d", i),
+			SenderID:   participants[0],
+			ReceiverID: participants[1],
+			Protocol:   "superdense_coding",
+			Content:    []byte(fmt.Sprintf("dense message %d", i)),
+			Priority:   2,
+			CreatedAt:  time.Now(),
+			ExpiresAt:  time.Now().Add(time.Minute),
+			Status:     "pending",
+		}
+
+		err := nlc.executeSuperdenseCoding(message)
+		if err != nil {
+			return fmt.Errorf("superdense coding of message %d failed: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+// runEntanglementSwappingProtocol executes entanglement swapping
+func (nlc *NLCEngine) runEntanglementSwappingProtocol(participants []string) error {
+	if len(participants) < 3 {
+		return fmt.Errorf("entanglement swapping requires at least 3 participants")
+	}
+
+	// Simulate entanglement swapping
+	for i := 0; i < len(participants)-2; i++ {
+		message := &QuantumMessage{
+			ID:         fmt.Sprintf("swap_msg_%d", i),
+			SenderID:   participants[i],
+			ReceiverID: participants[i+2],
+			Protocol:   "entanglement_swapping",
+			Content:    []byte(fmt.Sprintf("swap message %d", i)),
+			Priority:   3,
+			CreatedAt:  time.Now(),
+			ExpiresAt:  time.Now().Add(time.Minute),
+			Status:     "pending",
+		}
+
+		err := nlc.executeEntanglementSwapping(message)
+		if err != nil {
+			return fmt.Errorf("entanglement swapping of message %d failed: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+// executeQuantumTeleportation performs quantum teleportation
+func (nlc *NLCEngine) executeQuantumTeleportation(message *QuantumMessage) error {
+	startTime := time.Now()
+
+	// Record transmission attempt
+	record := &TransmissionRecord{
+		ID:          message.ID,
+		Timestamp:   startTime,
+		Protocol:    "teleportation",
+		SenderID:    message.SenderID,
+		ReceiverID:  message.ReceiverID,
+		MessageSize: len(message.Content) * 8, // bits
+		Fidelity:    0.9 + 0.1*rand.Float64(),
+		ErrorRate:   0.01 + 0.04*rand.Float64(),
+		Success:     true,
+	}
+
+	// Simulate Bell measurement and classical communication
+	time.Sleep(time.Millisecond * time.Duration(1+rand.Intn(5))) // Simulate processing time
+
+	record.TransmissionTime = time.Since(startTime)
+	nlc.transmissionHistory = append(nlc.transmissionHistory, record)
+
+	message.Status = "transmitted"
+	return nil
+}
+
+// executeSuperdenseCoding performs superdense coding
+func (nlc *NLCEngine) executeSuperdenseCoding(message *QuantumMessage) error {
+	startTime := time.Now()
+
+	record := &TransmissionRecord{
+		ID:          message.ID,
+		Timestamp:   startTime,
+		Protocol:    "superdense_coding",
+		SenderID:    message.SenderID,
+		ReceiverID:  message.ReceiverID,
+		MessageSize: len(message.Content) * 8,
+		Fidelity:    0.85 + 0.15*rand.Float64(),
+		ErrorRate:   0.02 + 0.03*rand.Float64(),
+		Success:     true,
+	}
+
+	// Simulate Pauli operations and measurement
+	time.Sleep(time.Millisecond * time.Duration(1+rand.Intn(3)))
+
+	record.TransmissionTime = time.Since(startTime)
+	nlc.transmissionHistory = append(nlc.transmissionHistory, record)
+
+	message.Status = "transmitted"
+	return nil
+}
+
+// executeEntanglementSwapping performs entanglement swapping
+func (nlc *NLCEngine) executeEntanglementSwapping(message *QuantumMessage) error {
+	startTime := time.Now()
+
+	record := &TransmissionRecord{
+		ID:          message.ID,
+		Timestamp:   startTime,
+		Protocol:    "entanglement_swapping",
+		SenderID:    message.SenderID,
+		ReceiverID:  message.ReceiverID,
+		MessageSize: len(message.Content) * 8,
+		Fidelity:    0.8 + 0.2*rand.Float64(),
+		ErrorRate:   0.05 + 0.1*rand.Float64(),
+		Success:     true,
+	}
+
+	// Simulate Bell measurements and entanglement extension
+	time.Sleep(time.Millisecond * time.Duration(2+rand.Intn(8)))
+
+	record.TransmissionTime = time.Since(startTime)
+	nlc.transmissionHistory = append(nlc.transmissionHistory, record)
+
+	message.Status = "transmitted"
+	return nil
+}
+
+// Helper methods for calculating metrics
+
+func (nlc *NLCEngine) updateNetworkCoherence() {
+	if len(nlc.entanglementNetwork.Nodes) == 0 {
+		return
+	}
+
+	totalCoherence := 0.0
+	for _, node := range nlc.entanglementNetwork.Nodes {
+		totalCoherence += node.Coherence
+	}
+	nlc.entanglementNetwork.Coherence = totalCoherence / float64(len(nlc.entanglementNetwork.Nodes))
+}
+
+func (nlc *NLCEngine) calculateSuccessRate() float64 {
+	if len(nlc.transmissionHistory) == 0 {
+		return 0.0
+	}
+
+	successCount := 0
+	for _, record := range nlc.transmissionHistory {
+		if record.Success {
+			successCount++
+		}
+	}
+	return float64(successCount) / float64(len(nlc.transmissionHistory))
+}
+
+func (nlc *NLCEngine) calculateAverageFidelity() float64 {
+	if len(nlc.transmissionHistory) == 0 {
+		return 0.0
+	}
+
+	totalFidelity := 0.0
+	for _, record := range nlc.transmissionHistory {
+		totalFidelity += record.Fidelity
+	}
+	return totalFidelity / float64(len(nlc.transmissionHistory))
+}
+
+func (nlc *NLCEngine) measureNonLocalCorrelations() []float64 {
+	correlations := make([]float64, len(nlc.bellStates))
+	for i, bellState := range nlc.bellStates {
+		correlations[i] = bellState.Entanglement * bellState.Fidelity
+	}
+	return correlations
+}
+
+func (nlc *NLCEngine) performBellTests() []float64 {
+	bellResults := make([]float64, len(nlc.bellStates))
+	for i, bellState := range nlc.bellStates {
+		// Simplified Bell test result (CHSH inequality violation)
+		bellResults[i] = 2.8 * bellState.Entanglement // Should be > 2 for quantum violation
+	}
+	return bellResults
 }

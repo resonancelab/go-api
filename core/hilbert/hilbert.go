@@ -123,15 +123,8 @@ func (hs *HilbertSpace) CreateSuperposition() (*QuantumState, error) {
 	return hs.CreateState(amplitudes)
 }
 
-// NormalizeState ensures the state satisfies Σ|α_p|² = 1
-func (hs *HilbertSpace) NormalizeState(state *QuantumState) error {
-	if state == nil {
-		return fmt.Errorf("state cannot be nil")
-	}
-
-	state.mu.Lock()
-	defer state.mu.Unlock()
-
+// normalizeStateInternal normalizes the state without locking (assumes lock is held)
+func (hs *HilbertSpace) normalizeStateInternal(state *QuantumState) error {
 	// Calculate norm squared
 	normSquared := 0.0
 	for _, amp := range state.Amplitudes {
@@ -154,6 +147,26 @@ func (hs *HilbertSpace) NormalizeState(state *QuantumState) error {
 	return nil
 }
 
+// NormalizeState ensures the state satisfies Σ|α_p|² = 1
+func (hs *HilbertSpace) NormalizeState(state *QuantumState) error {
+	if state == nil {
+		return fmt.Errorf("state cannot be nil")
+	}
+
+	state.mu.Lock()
+	defer state.mu.Unlock()
+
+	return hs.normalizeStateInternal(state)
+}
+
+// updateStateMetricsInternal updates metrics without locking (assumes lock is held)
+func (hs *HilbertSpace) updateStateMetricsInternal(state *QuantumState) {
+	state.Entropy = hs.computeVonNeumannEntropy(state)
+	state.Coherence = hs.computeCoherence(state)
+	state.Energy = hs.computeEnergy(state)
+	state.LastUpdate = time.Now()
+}
+
 // UpdateStateMetrics computes and updates all metrics for the quantum state
 func (hs *HilbertSpace) UpdateStateMetrics(state *QuantumState) {
 	if state == nil {
@@ -163,10 +176,7 @@ func (hs *HilbertSpace) UpdateStateMetrics(state *QuantumState) {
 	state.mu.Lock()
 	defer state.mu.Unlock()
 
-	state.Entropy = hs.computeVonNeumannEntropy(state)
-	state.Coherence = hs.computeCoherence(state)
-	state.Energy = hs.computeEnergy(state)
-	state.LastUpdate = time.Now()
+	hs.updateStateMetricsInternal(state)
 }
 
 // computeVonNeumannEntropy calculates the von Neumann entropy S = -Tr(ρ ln ρ)
@@ -199,13 +209,7 @@ func (hs *HilbertSpace) computeCoherence(state *QuantumState) float64 {
 		}
 	}
 
-	// Normalize by maximum possible coherence
-	maxCoherence := float64(len(state.Amplitudes) * (len(state.Amplitudes) - 1) / 2)
-	if maxCoherence > 0 {
-		coherence /= maxCoherence
-	}
-
-	return math.Min(coherence, 1.0)
+	return coherence
 }
 
 // computeEnergy calculates the energy expectation value ⟨ψ|H|ψ⟩
@@ -254,7 +258,14 @@ func (hs *HilbertSpace) EvolveState(state *QuantumState, dt float64, hamiltonian
 	state.Normalized = false
 
 	// Renormalize after evolution
-	return hs.NormalizeState(state)
+	if err := hs.normalizeStateInternal(state); err != nil {
+		return err
+	}
+
+	// Update metrics
+	hs.updateStateMetricsInternal(state)
+
+	return nil
 }
 
 // CreatePrimeHamiltonian generates the prime-based Hamiltonian matrix
@@ -433,5 +444,368 @@ func (hs *HilbertSpace) CloneState(state *QuantumState) *QuantumState {
 		Energy:     state.Energy,
 		LastUpdate: time.Now(),
 		Normalized: state.Normalized,
+	}
+}
+
+// HolographicReconstruction represents the result of holographic reconstruction
+type HolographicReconstruction struct {
+	ReconstructedState  *QuantumState `json:"reconstructed_state"`
+	Confidence          float64       `json:"confidence"`
+	Coherence           float64       `json:"coherence"`
+	ReconstructionError float64       `json:"reconstruction_error"`
+	UsedFragments       int           `json:"used_fragments"`
+	TotalFragments      int           `json:"total_fragments"`
+}
+
+// ReconstructFromFragments performs holographic reconstruction from partial state fragments
+func (hs *HilbertSpace) ReconstructFromFragments(fragments []*QuantumState, referenceState *QuantumState) (*HolographicReconstruction, error) {
+	if len(fragments) == 0 {
+		return nil, fmt.Errorf("no fragments provided for reconstruction")
+	}
+
+	// Initialize reconstruction with the first fragment
+	reconstructed := hs.CloneState(fragments[0])
+	if reconstructed == nil {
+		return nil, fmt.Errorf("failed to clone first fragment")
+	}
+
+	// Apply holographic reconstruction algorithm
+	for i := 1; i < len(fragments); i++ {
+		if err := hs.holographicMerge(reconstructed, fragments[i]); err != nil {
+			return nil, fmt.Errorf("failed to merge fragment %d: %w", i, err)
+		}
+	}
+
+	// Apply reference-guided enhancement if reference is provided
+	if referenceState != nil {
+		if err := hs.referenceGuidedEnhancement(reconstructed, referenceState); err != nil {
+			return nil, fmt.Errorf("failed to apply reference enhancement: %w", err)
+		}
+	}
+
+	// Renormalize the reconstructed state
+	if err := hs.NormalizeState(reconstructed); err != nil {
+		return nil, fmt.Errorf("failed to normalize reconstructed state: %w", err)
+	}
+
+	// Update metrics
+	hs.UpdateStateMetrics(reconstructed)
+
+	// Calculate reconstruction quality metrics
+	confidence := hs.calculateReconstructionConfidence(reconstructed, fragments)
+	coherence := reconstructed.Coherence
+	reconstructionError := hs.calculateReconstructionError(reconstructed, fragments)
+
+	result := &HolographicReconstruction{
+		ReconstructedState:  reconstructed,
+		Confidence:          confidence,
+		Coherence:           coherence,
+		ReconstructionError: reconstructionError,
+		UsedFragments:       len(fragments),
+		TotalFragments:      len(fragments),
+	}
+
+	return result, nil
+}
+
+// holographicMerge merges a fragment into the reconstructed state using holographic principles
+func (hs *HilbertSpace) holographicMerge(reconstructed, fragment *QuantumState) error {
+	if len(reconstructed.Amplitudes) != len(fragment.Amplitudes) {
+		return fmt.Errorf("fragment dimension mismatch")
+	}
+
+	reconstructed.mu.Lock()
+	fragment.mu.RLock()
+	defer reconstructed.mu.Unlock()
+	defer fragment.mu.RUnlock()
+
+	// Calculate interference pattern between reconstructed state and fragment
+	interference := make([]complex128, len(reconstructed.Amplitudes))
+
+	for i := range reconstructed.Amplitudes {
+		// Holographic interference: combine amplitudes with phase coherence
+		reconstructedAmp := reconstructed.Amplitudes[i]
+		fragmentAmp := fragment.Amplitudes[i]
+
+		// Calculate cross-interference term
+		crossTerm := reconstructedAmp * cmplx.Conj(fragmentAmp)
+
+		// Apply holographic reconstruction formula
+		// New amplitude = old + fragment + interference correction
+		interference[i] = reconstructedAmp + fragmentAmp + 0.5*crossTerm
+	}
+
+	// Apply coherence weighting based on fragment quality
+	coherenceWeight := hs.calculateFragmentCoherence(fragment)
+	coherenceWeightComplex := complex(coherenceWeight, 0)
+	invCoherenceWeightComplex := complex(1-coherenceWeight, 0)
+
+	for i := range interference {
+		// Weighted combination preserving phase information
+		reconstructed.Amplitudes[i] = invCoherenceWeightComplex*reconstructed.Amplitudes[i] +
+			coherenceWeightComplex*interference[i]
+	}
+
+	reconstructed.LastUpdate = time.Now()
+	reconstructed.Normalized = false
+
+	return nil
+}
+
+// referenceGuidedEnhancement enhances reconstruction using a reference state
+func (hs *HilbertSpace) referenceGuidedEnhancement(reconstructed, reference *QuantumState) error {
+	if len(reconstructed.Amplitudes) != len(reference.Amplitudes) {
+		return fmt.Errorf("reference state dimension mismatch")
+	}
+
+	reconstructed.mu.Lock()
+	reference.mu.RLock()
+	defer reconstructed.mu.Unlock()
+	defer reference.mu.RUnlock()
+
+	// Calculate similarity between reconstructed and reference states
+	similarity, err := hs.ComputeFidelity(reconstructed, reference)
+	if err != nil {
+		return fmt.Errorf("failed to compute similarity: %w", err)
+	}
+
+	// Apply enhancement based on similarity
+	enhancementFactor := math.Min(similarity*2.0, 1.0) // Scale similarity to enhancement factor
+
+	for i := range reconstructed.Amplitudes {
+		// Guided enhancement: pull toward reference state
+		difference := reference.Amplitudes[i] - reconstructed.Amplitudes[i]
+		enhancementTerm := complex(enhancementFactor*0.3, 0) * difference
+		reconstructed.Amplitudes[i] += enhancementTerm
+	}
+
+	reconstructed.LastUpdate = time.Now()
+	reconstructed.Normalized = false
+
+	return nil
+}
+
+// calculateFragmentCoherence calculates the coherence quality of a fragment
+func (hs *HilbertSpace) calculateFragmentCoherence(fragment *QuantumState) float64 {
+	if fragment == nil {
+		return 0.0
+	}
+
+	// Use existing coherence calculation but normalize to [0,1]
+	coherence := hs.computeCoherence(fragment)
+
+	// Normalize coherence to [0,1] range
+	maxCoherence := float64(len(fragment.Amplitudes)) * float64(len(fragment.Amplitudes)-1) / 2.0
+	if maxCoherence > 0 {
+		coherence = math.Min(coherence/maxCoherence, 1.0)
+	}
+
+	return coherence
+}
+
+// calculateReconstructionConfidence calculates confidence in the reconstruction
+func (hs *HilbertSpace) calculateReconstructionConfidence(reconstructed *QuantumState, fragments []*QuantumState) float64 {
+	if len(fragments) == 0 {
+		return 0.0
+	}
+
+	totalConfidence := 0.0
+
+	// Calculate average fidelity with all fragments
+	for _, fragment := range fragments {
+		fidelity, err := hs.ComputeFidelity(reconstructed, fragment)
+		if err == nil {
+			totalConfidence += fidelity
+		}
+	}
+
+	confidence := totalConfidence / float64(len(fragments))
+
+	// Factor in reconstruction coherence
+	coherenceFactor := math.Min(reconstructed.Coherence*2.0, 1.0)
+
+	return (confidence + coherenceFactor) / 2.0
+}
+
+// calculateReconstructionError calculates the reconstruction error
+func (hs *HilbertSpace) calculateReconstructionError(reconstructed *QuantumState, fragments []*QuantumState) float64 {
+	if len(fragments) == 0 {
+		return 1.0
+	}
+
+	totalError := 0.0
+
+	// Calculate average distance to fragments
+	for _, fragment := range fragments {
+		fidelity, err := hs.ComputeFidelity(reconstructed, fragment)
+		if err == nil {
+			// Error = 1 - fidelity
+			totalError += (1.0 - fidelity)
+		} else {
+			totalError += 1.0 // Maximum error
+		}
+	}
+
+	return totalError / float64(len(fragments))
+}
+
+// CreateHolographicMemory creates a holographic memory system for pattern storage
+func (hs *HilbertSpace) CreateHolographicMemory(capacity int) *HolographicMemory {
+	return &HolographicMemory{
+		hilbertSpace: hs,
+		capacity:     capacity,
+		patterns:     make(map[string]*HolographicPattern),
+		interference: make([][]complex128, capacity),
+	}
+}
+
+// HolographicMemory represents a holographic memory system
+type HolographicMemory struct {
+	hilbertSpace *HilbertSpace
+	capacity     int
+	patterns     map[string]*HolographicPattern
+	interference [][]complex128
+	mu           sync.RWMutex
+}
+
+// HolographicPattern represents a stored holographic pattern
+type HolographicPattern struct {
+	ID          string        `json:"id"`
+	State       *QuantumState `json:"-"`
+	Strength    float64       `json:"strength"`
+	AccessCount int           `json:"access_count"`
+	LastAccess  time.Time     `json:"last_access"`
+}
+
+// StorePattern stores a pattern in holographic memory
+func (hm *HolographicMemory) StorePattern(id string, state *QuantumState) error {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+
+	if len(hm.patterns) >= hm.capacity {
+		return fmt.Errorf("memory capacity exceeded")
+	}
+
+	// Create interference pattern for storage
+	pattern := &HolographicPattern{
+		ID:          id,
+		State:       hm.hilbertSpace.CloneState(state),
+		Strength:    1.0,
+		AccessCount: 0,
+		LastAccess:  time.Now(),
+	}
+
+	hm.patterns[id] = pattern
+
+	// Update interference matrix
+	hm.updateInterferenceMatrix()
+
+	return nil
+}
+
+// RetrievePattern retrieves a pattern from holographic memory
+func (hm *HolographicMemory) RetrievePattern(id string) (*QuantumState, error) {
+	hm.mu.RLock()
+	pattern, exists := hm.patterns[id]
+	hm.mu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("pattern not found: %s", id)
+	}
+
+	// Update access statistics
+	hm.mu.Lock()
+	pattern.AccessCount++
+	pattern.LastAccess = time.Now()
+	hm.mu.Unlock()
+
+	// Reconstruct pattern using holographic principles
+	reconstructed, err := hm.reconstructPattern(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reconstruct pattern: %w", err)
+	}
+
+	return reconstructed, nil
+}
+
+// reconstructPattern reconstructs a pattern using holographic reconstruction
+func (hm *HolographicMemory) reconstructPattern(pattern *HolographicPattern) (*QuantumState, error) {
+	reconstructed := hm.hilbertSpace.CloneState(pattern.State)
+	if reconstructed == nil {
+		return nil, fmt.Errorf("failed to clone pattern state")
+	}
+
+	// Apply holographic reconstruction from interference patterns
+	// This is a simplified implementation - in practice would use more sophisticated algorithms
+
+	// Apply strength-based enhancement
+	strengthFactor := math.Min(pattern.Strength*1.5, 1.0)
+	for i := range reconstructed.Amplitudes {
+		reconstructed.Amplitudes[i] *= complex(strengthFactor, 0)
+	}
+
+	// Renormalize
+	if err := hm.hilbertSpace.NormalizeState(reconstructed); err != nil {
+		return nil, fmt.Errorf("failed to renormalize reconstructed state: %w", err)
+	}
+
+	return reconstructed, nil
+}
+
+// updateInterferenceMatrix updates the holographic interference matrix
+func (hm *HolographicMemory) updateInterferenceMatrix() {
+	dimension := hm.hilbertSpace.GetDimension()
+	hm.interference = make([][]complex128, dimension)
+
+	for i := range hm.interference {
+		hm.interference[i] = make([]complex128, dimension)
+
+		// Calculate interference from all stored patterns
+		for _, pattern := range hm.patterns {
+			if i < len(pattern.State.Amplitudes) {
+				amplitude := pattern.State.Amplitudes[i]
+				// Add to interference matrix
+				hm.interference[i][i] += amplitude * complex(pattern.Strength, 0)
+			}
+		}
+	}
+}
+
+// GetMemoryStats returns statistics about the holographic memory
+func (hm *HolographicMemory) GetMemoryStats() map[string]interface{} {
+	hm.mu.RLock()
+	defer hm.mu.RUnlock()
+
+	totalAccess := 0
+	oldestAccess := time.Now()
+	newestAccess := time.Time{}
+
+	for _, pattern := range hm.patterns {
+		totalAccess += pattern.AccessCount
+		if pattern.LastAccess.Before(oldestAccess) {
+			oldestAccess = pattern.LastAccess
+		}
+		if pattern.LastAccess.After(newestAccess) {
+			newestAccess = pattern.LastAccess
+		}
+	}
+
+	avgStrength := 0.0
+	if len(hm.patterns) > 0 {
+		for _, pattern := range hm.patterns {
+			avgStrength += pattern.Strength
+		}
+		avgStrength /= float64(len(hm.patterns))
+	}
+
+	return map[string]interface{}{
+		"capacity":        hm.capacity,
+		"stored_patterns": len(hm.patterns),
+		"utilization":     float64(len(hm.patterns)) / float64(hm.capacity),
+		"total_access":    totalAccess,
+		"avg_access":      float64(totalAccess) / math.Max(float64(len(hm.patterns)), 1),
+		"avg_strength":    avgStrength,
+		"oldest_access":   oldestAccess,
+		"newest_access":   newestAccess,
 	}
 }

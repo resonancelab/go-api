@@ -1,7 +1,3 @@
-module github.com/resonancelab/psizero/api/core
+module github.com/resonancelab/psizero/core
 
 go 1.21
-
-require (
-	github.com/google/uuid v1.3.0
-)

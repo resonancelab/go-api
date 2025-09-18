@@ -2,6 +2,7 @@ package qcr
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -288,39 +289,6 @@ type QuantumCorrelation struct {
 	EntanglementDegree float64 `json:"entanglement_degree"`
 }
 
-type Coalition struct {
-	Members  []string `json:"members"`
-	Strength float64  `json:"strength"`
-	Purpose  string   `json:"purpose"`
-}
-
-type CompetitionMechanism struct {
-	CompetitionStrength float64 `json:"competition_strength"`
-	WinnerTakeAll       bool    `json:"winner_take_all"`
-}
-
-type AccessConsciousness struct {
-	AccessibleContent  *hilbert.QuantumState `json:"-"`
-	ReportabilityLevel float64               `json:"reportability_level"`
-}
-
-type PhenomenalConsciousness struct {
-	SubjectiveExperience *hilbert.QuantumState `json:"-"`
-	QualiaIntensity      float64               `json:"qualia_intensity"`
-}
-
-type AttentionFilter struct {
-	FilterType     string  `json:"filter_type"`
-	Selectivity    float64 `json:"selectivity"`
-	FilterStrength float64 `json:"filter_strength"`
-}
-
-type AttentionNetwork struct {
-	NetworkType  string             `json:"network_type"`
-	Connectivity map[string]float64 `json:"connectivity"`
-	Efficiency   float64            `json:"efficiency"`
-}
-
 // NewQCREngine creates a new Quantum Consciousness Resonator engine
 func NewQCREngine() (*QCREngine, error) {
 	// Initialize core resonance engine for consciousness simulation
@@ -401,4 +369,422 @@ func (qcr *QCREngine) SimulateConsciousness(simulationType string, parameters ma
 	}
 
 	return result, qcr.telemetryPoints, nil
+}
+
+// initializeConsciousnessField initializes the unified consciousness field
+func (qcr *QCREngine) initializeConsciousnessField() error {
+	// Create consciousness field quantum state
+	amplitudes := make([]complex128, qcr.resonanceEngine.GetDimension())
+	for i := range amplitudes {
+		amplitudes[i] = complex(0.1, 0) // Low initial consciousness
+	}
+
+	consciousnessState, err := qcr.resonanceEngine.CreateQuantumState(amplitudes)
+	if err != nil {
+		return fmt.Errorf("failed to create consciousness state: %w", err)
+	}
+
+	qcr.consciousnessField = &ConsciousnessField{
+		ID:                 "primary_consciousness",
+		QuantumState:       consciousnessState,
+		Coherence:          0.5,
+		Intensity:          0.3,
+		Resonance:          0.7,
+		PrimeBasisModes:    qcr.resonanceEngine.GetPrimeBasis()[:10], // First 10 primes
+		ConsciousnessLevel: 0.1,
+		IntegratedInfo:     0.0,
+		GlobalWorkspace: &GlobalWorkspace{
+			WorkspaceCoalitions:     make([]*Coalition, 0),
+			BroadcastThreshold:      0.7,
+			AccessConsciousness:     &AccessConsciousness{ReportabilityLevel: 0.5},
+			PhenomenalConsciousness: &PhenomenalConsciousness{QualiaIntensity: 0.3},
+		},
+		AttentionMechanism: &AttentionMechanism{
+			FocusVector:          make([]float64, 10),
+			AttentionCapacity:    5.0,
+			SelectiveFilters:     make([]*AttentionFilter, 0),
+			SaliencyMap:          make([][]float64, 10),
+			AttentionNetworks:    make(map[string]*AttentionNetwork),
+			DistractibilityLevel: 0.3,
+		},
+		EmergentProperties: make(map[string]float64),
+	}
+
+	return nil
+}
+
+// createConsciousEntities creates conscious entities for the simulation
+func (qcr *QCREngine) createConsciousEntities(simulationType string, parameters map[string]interface{}) error {
+	entityCount := 3 // Default entity count
+
+	if count, exists := parameters["entity_count"].(int); exists {
+		entityCount = count
+	}
+
+	for i := 0; i < entityCount; i++ {
+		entity, err := qcr.createConsciousEntity(fmt.Sprintf("entity_%d", i), i)
+		if err != nil {
+			return fmt.Errorf("failed to create entity %d: %w", i, err)
+		}
+		qcr.consciousEntities = append(qcr.consciousEntities, entity)
+	}
+
+	return nil
+}
+
+// createConsciousEntity creates a single conscious entity
+func (qcr *QCREngine) createConsciousEntity(entityID string, index int) (*ConsciousEntity, error) {
+	// Create quantum state for entity
+	amplitudes := make([]complex128, qcr.resonanceEngine.GetDimension())
+	for i := range amplitudes {
+		phase := float64(index) * 2.0 * 3.14159 / float64(len(amplitudes))
+		amplitudes[i] = complex(0.1*math.Cos(phase), 0.1*math.Sin(phase))
+	}
+
+	quantumState, err := qcr.resonanceEngine.CreateQuantumState(amplitudes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create entity state: %w", err)
+	}
+
+	entity := &ConsciousEntity{
+		ID:                 entityID,
+		Type:               "observer",
+		QuantumState:       quantumState,
+		AwarenessLevel:     0.3 + 0.2*float64(index)/10.0,
+		AttentionFocus:     make([]float64, 5),
+		MemoryCapacity:     100,
+		ProcessingSpeed:    1.0 + 0.1*float64(index),
+		ConsciousnessPhase: "singularity",
+		ResonancePatterns:  make([]ResonancePattern, 0),
+		CognitiveModules:   make(map[string]*CognitiveModule),
+		SelfModel: &SelfModel{
+			SelfAwareness:     0.5,
+			IdentityCoherence: 0.7,
+		},
+		WorldModel: &WorldModel{
+			ModelAccuracy:        0.6,
+			UncertaintyEstimates: make(map[string]float64),
+		},
+		ExperienceBuffer: make([]*Experience, 0),
+		EmotionalState: &EmotionalState{
+			PrimaryEmotions:     make(map[string]float64),
+			EmotionalValence:    0.0,
+			EmotionalArousal:    0.5,
+			MoodState:           "neutral",
+			EmpatheticResonance: make(map[string]float64),
+		},
+		DecisionMaking: &DecisionMakingSystem{
+			DecisionProcesses:    make([]*DecisionProcess, 0),
+			RationalityLevel:     0.7,
+			IntuitionLevel:       0.3,
+			DecisionHistory:      make([]*Decision, 0),
+			LearningFromOutcomes: true,
+		},
+		LastUpdate: time.Now(),
+	}
+
+	// Initialize cognitive modules
+	modules := []string{"perception", "memory", "reasoning", "emotion", "attention"}
+	for _, moduleName := range modules {
+		module := &CognitiveModule{
+			Name:               moduleName,
+			Function:           moduleName,
+			ActivationLevel:    0.5,
+			ProcessingCapacity: 1.0,
+			Connections:        make(map[string]float64),
+			LearningRate:       0.1,
+		}
+		entity.CognitiveModules[moduleName] = module
+	}
+
+	return entity, nil
+}
+
+// initializeMemoryMatrix initializes the consciousness memory system
+func (qcr *QCREngine) initializeMemoryMatrix() error {
+	qcr.memoryMatrix = &MemoryMatrix{
+		ShortTermMemory:  make([]*MemoryTrace, 0),
+		LongTermMemory:   make([]*MemoryTrace, 0),
+		EpisodicMemory:   make([]*EpisodicMemory, 0),
+		SemanticMemory:   make(map[string]*SemanticMemory),
+		ProceduralMemory: make([]*ProceduralMemory, 0),
+		WorkingMemory: &WorkingMemory{
+			ActiveContent: make([]*hilbert.QuantumState, 0),
+			Capacity:      7, // Miller's magic number
+		},
+		TotalCapacity:    qcr.config.MemoryCapacity,
+		UsedCapacity:     0,
+		CompressionRatio: 1.0,
+	}
+
+	return nil
+}
+
+// evolveConsciousness runs the main consciousness evolution simulation
+func (qcr *QCREngine) evolveConsciousness() (*ConsciousnessSimulationResult, error) {
+	converged := false
+	finalConsciousnessLevel := 0.0
+
+	for cycle := 0; cycle < qcr.config.MaxSimulationCycles && !converged; cycle++ {
+		qcr.currentCycle = cycle
+
+		// Evolve consciousness field
+		if err := qcr.evolveConsciousnessField(); err != nil {
+			return nil, fmt.Errorf("consciousness field evolution failed at cycle %d: %w", cycle, err)
+		}
+
+		// Evolve conscious entities
+		if err := qcr.evolveConsciousEntities(); err != nil {
+			return nil, fmt.Errorf("entity evolution failed at cycle %d: %w", cycle, err)
+		}
+
+		// Update awareness networks
+		if err := qcr.updateAwarenessNetworks(); err != nil {
+			return nil, fmt.Errorf("awareness network update failed at cycle %d: %w", cycle, err)
+		}
+
+		// Process observer effects
+		if err := qcr.processObserverEffects(); err != nil {
+			return nil, fmt.Errorf("observer effect processing failed at cycle %d: %w", cycle, err)
+		}
+
+		// Update evolution phase
+		qcr.updateEvolutionPhase(cycle)
+
+		// Check convergence
+		converged = qcr.checkConsciousnessConvergence()
+		finalConsciousnessLevel = qcr.consciousnessField.ConsciousnessLevel
+
+		// Record telemetry
+		qcr.recordConsciousnessTelemetry(cycle)
+	}
+
+	// Generate final result
+	result := &ConsciousnessSimulationResult{
+		SessionID:               fmt.Sprintf("consciousness_%d", time.Now().Unix()),
+		FinalConsciousnessLevel: finalConsciousnessLevel,
+		IntegratedInformation:   qcr.consciousnessField.IntegratedInfo,
+		AwarenessNetworks:       len(qcr.awarenessNetworks),
+		EmergentPhenomena:       qcr.identifyEmergentPhenomena(),
+		ObserverEffects:         len(qcr.observerEffects),
+		MemoryFormation:         len(qcr.memoryMatrix.LongTermMemory),
+		DecisionsMade:           qcr.countDecisionsMade(),
+		EmotionalEvolution:      qcr.calculateEmotionalEvolution(),
+		ConsciousnessCoherence:  qcr.consciousnessField.Coherence,
+		SelfAwarenessLevel:      qcr.calculateAverageSelfAwareness(),
+		ProcessingTime:          time.Since(qcr.startTime).Seconds(),
+		Success:                 converged,
+	}
+
+	return result, nil
+}
+
+// evolveConsciousnessField evolves the consciousness field
+func (qcr *QCREngine) evolveConsciousnessField() error {
+	// Evolve field using resonance engine
+	evolvedState, err := qcr.resonanceEngine.EvolveStateWithResonance(
+		qcr.consciousnessField.QuantumState,
+		qcr.consciousnessField.Resonance,
+		100.0, // time parameter in milliseconds
+	)
+	if err != nil {
+		return fmt.Errorf("failed to evolve consciousness field: %w", err)
+	}
+
+	qcr.consciousnessField.QuantumState = evolvedState
+	qcr.consciousnessField.Coherence = evolvedState.Coherence
+	qcr.consciousnessField.ConsciousnessLevel += 0.01 // Gradual increase
+
+	return nil
+}
+
+// evolveConsciousEntities evolves all conscious entities
+func (qcr *QCREngine) evolveConsciousEntities() error {
+	for _, entity := range qcr.consciousEntities {
+		// Evolve entity quantum state
+		evolvedState, err := qcr.resonanceEngine.EvolveStateWithResonance(
+			entity.QuantumState,
+			entity.AwarenessLevel,
+			50.0, // time parameter in milliseconds
+		)
+		if err != nil {
+			return fmt.Errorf("failed to evolve entity %s: %w", entity.ID, err)
+		}
+
+		entity.QuantumState = evolvedState
+		entity.AwarenessLevel += 0.005 // Gradual awareness increase
+		entity.LastUpdate = time.Now()
+
+		// Update cognitive modules
+		for _, module := range entity.CognitiveModules {
+			module.ActivationLevel = 0.9*module.ActivationLevel + 0.1*entity.AwarenessLevel
+		}
+	}
+
+	return nil
+}
+
+// updateAwarenessNetworks updates the awareness networks
+func (qcr *QCREngine) updateAwarenessNetworks() error {
+	// Create or update awareness networks between entities
+	if len(qcr.consciousEntities) >= 2 {
+		network := &AwarenessNetwork{
+			ID:                    fmt.Sprintf("network_%d", len(qcr.awarenessNetworks)),
+			ParticipatingEntities: make([]string, 0),
+			NetworkTopology:       "mesh",
+			SynchronizationLevel:  0.5,
+			InformationFlow:       make(map[string]map[string]float64),
+			EmergentBehaviors:     make([]string, 0),
+			ConsensusLevel:        0.6,
+			Coherence:             0.7,
+		}
+
+		for _, entity := range qcr.consciousEntities {
+			network.ParticipatingEntities = append(network.ParticipatingEntities, entity.ID)
+		}
+
+		// Create collective state (simplified)
+		amplitudes := make([]complex128, qcr.resonanceEngine.GetDimension())
+		for i := range amplitudes {
+			amplitudes[i] = complex(0.1, 0)
+		}
+
+		collectiveState, err := qcr.resonanceEngine.CreateQuantumState(amplitudes)
+		if err != nil {
+			return fmt.Errorf("failed to create collective state: %w", err)
+		}
+
+		network.CollectiveState = collectiveState
+		qcr.awarenessNetworks = append(qcr.awarenessNetworks, network)
+	}
+
+	return nil
+}
+
+// processObserverEffects processes quantum observer effects
+func (qcr *QCREngine) processObserverEffects() error {
+	for _, entity := range qcr.consciousEntities {
+		effect := &ObserverEffect{
+			ID:                   fmt.Sprintf("effect_%d", len(qcr.observerEffects)),
+			ObserverID:           entity.ID,
+			ObservedSystem:       "consciousness_field",
+			MeasurementType:      "awareness_measurement",
+			ConsciousnessEffects: make(map[string]float64),
+			Timestamp:            time.Now(),
+			Duration:             time.Millisecond * 100,
+		}
+
+		effect.ConsciousnessEffects["awareness_change"] = entity.AwarenessLevel * 0.1
+		effect.ConsciousnessEffects["coherence_change"] = entity.QuantumState.Coherence * 0.05
+
+		qcr.observerEffects = append(qcr.observerEffects, effect)
+	}
+
+	return nil
+}
+
+// updateEvolutionPhase updates the consciousness evolution phase
+func (qcr *QCREngine) updateEvolutionPhase(cycle int) {
+	totalCycles := qcr.config.MaxSimulationCycles
+	progress := float64(cycle) / float64(totalCycles)
+
+	switch {
+	case progress < 0.25:
+		qcr.evolutionPhase = "singularity"
+	case progress < 0.5:
+		qcr.evolutionPhase = "duality"
+	case progress < 0.75:
+		qcr.evolutionPhase = "trinity"
+	default:
+		qcr.evolutionPhase = "integration"
+	}
+}
+
+// checkConsciousnessConvergence checks if consciousness has converged
+func (qcr *QCREngine) checkConsciousnessConvergence() bool {
+	return qcr.consciousnessField.ConsciousnessLevel > 0.9 &&
+		qcr.consciousnessField.Coherence > 0.8
+}
+
+// recordConsciousnessTelemetry records telemetry data
+func (qcr *QCREngine) recordConsciousnessTelemetry(cycle int) {
+	// Create telemetry point using the correct structure
+	telemetry := types.TelemetryPoint{
+		Step:              cycle,
+		SymbolicEntropy:   qcr.consciousnessField.IntegratedInfo,
+		LyapunovMetric:    qcr.consciousnessField.Coherence,
+		SatisfactionRate:  qcr.consciousnessField.ConsciousnessLevel,
+		ResonanceStrength: qcr.consciousnessField.Resonance,
+		Dominance:         qcr.consciousnessField.Intensity,
+		Timestamp:         time.Now(),
+	}
+
+	qcr.telemetryPoints = append(qcr.telemetryPoints, telemetry)
+
+	// Update consciousness metrics
+	qcr.consciousnessMetrics["cycle"] = float64(cycle)
+	qcr.consciousnessMetrics["consciousness_level"] = qcr.consciousnessField.ConsciousnessLevel
+	qcr.consciousnessMetrics["coherence"] = qcr.consciousnessField.Coherence
+	qcr.consciousnessMetrics["entity_count"] = float64(len(qcr.consciousEntities))
+	qcr.consciousnessMetrics["network_count"] = float64(len(qcr.awarenessNetworks))
+}
+
+// Helper methods for final result calculation
+
+func (qcr *QCREngine) identifyEmergentPhenomena() []string {
+	phenomena := []string{}
+
+	if qcr.consciousnessField.ConsciousnessLevel > 0.5 {
+		phenomena = append(phenomena, "self_awareness")
+	}
+
+	if len(qcr.awarenessNetworks) > 0 {
+		phenomena = append(phenomena, "collective_consciousness")
+	}
+
+	if qcr.consciousnessField.Coherence > 0.7 {
+		phenomena = append(phenomena, "consciousness_coherence")
+	}
+
+	return phenomena
+}
+
+func (qcr *QCREngine) countDecisionsMade() int {
+	totalDecisions := 0
+	for _, entity := range qcr.consciousEntities {
+		totalDecisions += len(entity.DecisionMaking.DecisionHistory)
+	}
+	return totalDecisions
+}
+
+func (qcr *QCREngine) calculateEmotionalEvolution() map[string]float64 {
+	evolution := make(map[string]float64)
+
+	if len(qcr.consciousEntities) > 0 {
+		avgValence := 0.0
+		avgArousal := 0.0
+
+		for _, entity := range qcr.consciousEntities {
+			avgValence += entity.EmotionalState.EmotionalValence
+			avgArousal += entity.EmotionalState.EmotionalArousal
+		}
+
+		evolution["average_valence"] = avgValence / float64(len(qcr.consciousEntities))
+		evolution["average_arousal"] = avgArousal / float64(len(qcr.consciousEntities))
+	}
+
+	return evolution
+}
+
+func (qcr *QCREngine) calculateAverageSelfAwareness() float64 {
+	if len(qcr.consciousEntities) == 0 {
+		return 0.0
+	}
+
+	totalAwareness := 0.0
+	for _, entity := range qcr.consciousEntities {
+		totalAwareness += entity.SelfModel.SelfAwareness
+	}
+
+	return totalAwareness / float64(len(qcr.consciousEntities))
 }

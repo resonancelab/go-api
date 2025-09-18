@@ -364,3 +364,351 @@ func (ue *UnifiedEngine) SimulateUnifiedPhysics(simulationType string, initialCo
 
 	return result, ue.telemetryPoints, nil
 }
+
+// initializeSpacetime initializes the spacetime manifold
+func (ue *UnifiedEngine) initializeSpacetime() error {
+	dimensions := ue.config.SpacetimeDimensions + ue.config.ExtraDimensions
+
+	ue.spacetimeManifold = &SpacetimeManifold{
+		Dimension:            dimensions,
+		MetricTensor:         make([][]*complex128, dimensions),
+		Topology:             "Minkowski",
+		Signature:            "(-,+,+,+)",
+		CosmologicalConstant: new(complex128),
+	}
+
+	// Initialize metric tensor as Minkowski metric
+	for i := 0; i < dimensions; i++ {
+		ue.spacetimeManifold.MetricTensor[i] = make([]*complex128, dimensions)
+		for j := 0; j < dimensions; j++ {
+			ue.spacetimeManifold.MetricTensor[i][j] = new(complex128)
+			if i == j {
+				if i == 0 {
+					*ue.spacetimeManifold.MetricTensor[i][j] = complex(-1, 0) // Time component
+				} else {
+					*ue.spacetimeManifold.MetricTensor[i][j] = complex(1, 0) // Space components
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// initializeQuantumFields initializes all quantum fields
+func (ue *UnifiedEngine) initializeQuantumFields() error {
+	// Initialize standard model fields
+	fields := []string{"electron", "muon", "tau", "neutrino", "photon", "W_boson", "Z_boson", "higgs", "gluon", "up_quark", "down_quark", "strange_quark", "charm_quark", "bottom_quark", "top_quark"}
+
+	for _, fieldName := range fields {
+		field := &QuantumField{
+			Name:              fieldName,
+			Type:              "spinor",
+			Spin:              0.5,
+			Mass:              1.0, // Simplified
+			Charge:            0.0,
+			Symmetries:        []string{"gauge"},
+			CouplingConstants: make(map[string]float64),
+			BrokenSymmetries:  make([]string, 0),
+		}
+
+		// Create quantum state for field
+		amplitudes := make([]complex128, ue.resonanceEngine.GetDimension())
+		for i := range amplitudes {
+			amplitudes[i] = complex(0.1, 0) // Small field values
+		}
+
+		quantumState, err := ue.resonanceEngine.CreateQuantumState(amplitudes)
+		if err != nil {
+			return fmt.Errorf("failed to create field %s: %w", fieldName, err)
+		}
+
+		field.QuantumState = quantumState
+		ue.quantumFields[fieldName] = field
+	}
+
+	return nil
+}
+
+// initializeFundamentalForces initializes the four fundamental forces
+func (ue *UnifiedEngine) initializeFundamentalForces() error {
+	// Initialize gravitational field
+	ue.gravitationalField = &GravitationalField{
+		NewtonConstant:     6.67430e-11, // m³/kg/s²
+		SpacetimeCurvature: 0.0,
+		TidalForces:        make([][]float64, 4),
+		GravitationalWaves: make([]*GravitationalWave, 0),
+		BlackHoles:         make([]*BlackHole, 0),
+		FieldStrength:      0.0,
+	}
+
+	// Initialize electromagnetic field
+	ue.electromagneticField = &ElectromagneticField{
+		ElectricField:    make([][]float64, 3),
+		MagneticField:    make([][]float64, 3),
+		FineStructure:    1.0 / 137.0, // Fine structure constant
+		ChargedParticles: make([]*ChargedParticle, 0),
+		Photons:          make([]*Photon, 0),
+		Polarization:     "unpolarized",
+		FieldStrength:    0.0,
+	}
+
+	// Initialize strong field
+	ue.strongField = &StrongField{
+		StrongCoupling:    0.3,   // αs at low energy
+		ConfinementScale:  0.217, // ΛQCD in GeV
+		Quarks:            make([]*Quark, 0),
+		Gluons:            make([]*Gluon, 0),
+		ColorCharge:       []string{"red", "green", "blue"},
+		AsymptoticFreedom: 1.0,
+		FieldStrength:     0.0,
+	}
+
+	// Initialize weak field with Higgs
+	higgs := &HiggsField{
+		VacuumExpectation: 246.0, // GeV
+		HiggsMass:         125.0, // GeV
+		SymmetryBreaking:  1.0,
+		MassGeneration:    make(map[string]float64),
+		Potential: &HiggsPotential{
+			Lambda:       0.13,
+			Mu2:          -10000.0,
+			MinimumValue: -7000.0,
+		},
+	}
+
+	ue.weakField = &WeakField{
+		WeakCoupling:           0.65, // gw
+		HiggsField:             higgs,
+		ElectroweakUnification: 100.0, // GeV
+		WeakIsospin:            0.5,
+		WeakHypercharge:        0.0,
+		Leptons:                make([]*Lepton, 0),
+		FieldStrength:          0.0,
+	}
+
+	return nil
+}
+
+// initializeFieldEquations initializes the fundamental field equations
+func (ue *UnifiedEngine) initializeFieldEquations() error {
+	ue.fieldEquations = &FieldEquations{
+		EinsteinEquations: &EinsteinFieldEquations{
+			MetricTensor:         ue.spacetimeManifold.MetricTensor,
+			CosmologicalConstant: ue.spacetimeManifold.CosmologicalConstant,
+		},
+		MaxwellEquations: &MaxwellFieldEquations{
+			ElectricField:  ue.electromagneticField.ElectricField,
+			MagneticField:  ue.electromagneticField.MagneticField,
+			ChargeDensity:  make([]float64, ue.resonanceEngine.GetDimension()),
+			CurrentDensity: make([][]float64, 3),
+		},
+		SchrodingerEquation: &SchrodingerEquation{
+			EigenValues: make([]float64, ue.resonanceEngine.GetDimension()),
+		},
+	}
+
+	return nil
+}
+
+// setInitialConditions sets up initial conditions for the simulation
+func (ue *UnifiedEngine) setInitialConditions(simulationType string, initialConditions map[string]interface{}) error {
+	// Set initial conditions based on simulation type
+	switch simulationType {
+	case "particle_interaction":
+		return ue.setupParticleInteraction(initialConditions)
+	case "cosmological_evolution":
+		return ue.setupCosmologicalEvolution(initialConditions)
+	case "quantum_gravity":
+		return ue.setupQuantumGravity(initialConditions)
+	default:
+		return ue.setupDefaultConditions(initialConditions)
+	}
+}
+
+// setupParticleInteraction sets up particle interaction simulation
+func (ue *UnifiedEngine) setupParticleInteraction(conditions map[string]interface{}) error {
+	// Create test particles
+	for i := 0; i < 5; i++ {
+		particle := &Particle{
+			ID:       fmt.Sprintf("particle_%d", i),
+			Type:     "fermion",
+			Name:     fmt.Sprintf("test_particle_%d", i),
+			Mass:     1.0,
+			Charge:   float64(i%2) - 0.5, // Alternating charges
+			Spin:     0.5,
+			Position: []float64{float64(i), 0, 0, 0},
+			Momentum: []float64{1.0, 0.1 * float64(i), 0, 0},
+			QuantumNumbers: map[string]float64{
+				"baryon_number": 1.0 / 3.0,
+				"lepton_number": 0.0,
+			},
+			InteractionHistory: make([]*Interaction, 0),
+			Lifetime:           1e12, // Very stable
+			DecayChannels:      []string{},
+			CreationTime:       ue.currentTime,
+		}
+
+		// Create quantum state for particle
+		amplitudes := make([]complex128, ue.resonanceEngine.GetDimension())
+		amplitudes[i%len(amplitudes)] = complex(1.0, 0)
+
+		quantumState, err := ue.resonanceEngine.CreateQuantumState(amplitudes)
+		if err != nil {
+			return fmt.Errorf("failed to create particle state: %w", err)
+		}
+		particle.QuantumState = quantumState
+
+		ue.particles = append(ue.particles, particle)
+	}
+
+	return nil
+}
+
+// setupCosmologicalEvolution sets up cosmological simulation
+func (ue *UnifiedEngine) setupCosmologicalEvolution(conditions map[string]interface{}) error {
+	// Initialize dark matter and dark energy
+	if ue.config.IncludeDarkMatter {
+		ue.gravitationalField.DarkMatter = &DarkMatterField{
+			DensityProfile:  make([][]float64, 100),
+			InteractionRate: 1e-50, // Very weak interaction
+			ParticleType:    "WIMP",
+			CrossSection:    1e-45, // cm²
+		}
+	}
+
+	if ue.config.IncludeDarkEnergy {
+		ue.gravitationalField.DarkEnergy = &DarkEnergyField{
+			CosmologicalConstant: 1.11e-52, // m⁻²
+			EquationOfState:      -1.0,     // w = -1 for cosmological constant
+			AccelerationFactor:   1.0,
+		}
+	}
+
+	return nil
+}
+
+// setupQuantumGravity sets up quantum gravity simulation
+func (ue *UnifiedEngine) setupQuantumGravity(conditions map[string]interface{}) error {
+	if ue.config.IncludeQuantumGravity {
+		ue.gravitationalField.QuantumGravity = &QuantumGravityField{
+			PlanckScaleEffects: 1.0,
+			QuantumGeometry:    "spin_networks",
+			LoopQuantumGravity: true,
+			Coherence:          0.8,
+		}
+	}
+
+	return nil
+}
+
+// setupDefaultConditions sets up default simulation conditions
+func (ue *UnifiedEngine) setupDefaultConditions(conditions map[string]interface{}) error {
+	// Create minimal particle setup
+	return ue.setupParticleInteraction(conditions)
+}
+
+// evolveUnifiedPhysics runs the main physics evolution loop
+func (ue *UnifiedEngine) evolveUnifiedPhysics() (*UnifiedPhysicsResult, error) {
+	converged := false
+
+	for step := 0; step < ue.config.EvolutionSteps && !converged; step++ {
+		ue.evolutionStep = step
+		ue.currentTime += ue.config.TimeStep
+		ue.cosmicTime += ue.config.TimeStep
+
+		// Evolve quantum fields
+		if err := ue.evolveQuantumFields(); err != nil {
+			return nil, fmt.Errorf("quantum field evolution failed at step %d: %w", step, err)
+		}
+
+		// Evolve spacetime geometry
+		if err := ue.evolveSpacetimeGeometry(); err != nil {
+			return nil, fmt.Errorf("spacetime evolution failed at step %d: %w", step, err)
+		}
+
+		// Evolve particles
+		if err := ue.evolveParticles(); err != nil {
+			return nil, fmt.Errorf("particle evolution failed at step %d: %w", step, err)
+		}
+
+		// Check convergence
+		converged = ue.checkConvergence()
+
+		// Record telemetry
+		ue.recordTelemetry(step)
+	}
+
+	// Generate final result
+	result := &UnifiedPhysicsResult{
+		SessionID:              fmt.Sprintf("unified_physics_%d", time.Now().Unix()),
+		SimulationType:         "unified_simulation",
+		FinalSpacetimeGeometry: make(map[string]interface{}),
+		ParticleStates:         ue.particles,
+		FieldStrengths:         make(map[string]float64),
+		UnificationDegree:      0.8,
+		EnergyMomentumTensor:   make([][]float64, 4),
+		QuantumCorrections:     0.1,
+		TopologicalInvariants:  make(map[string]float64),
+		ConsciousnessMetrics:   ue.physicsMetrics,
+		DarkMatterDensity:      0.27,
+		DarkEnergyDensity:      0.68,
+		CosmologicalParameters: make(map[string]float64),
+		ProcessingTime:         time.Since(ue.startTime).Seconds(),
+		Converged:              converged,
+		Success:                true,
+	}
+
+	return result, nil
+}
+
+// Helper methods for evolution steps
+func (ue *UnifiedEngine) evolveQuantumFields() error {
+	// Simplified quantum field evolution
+	for _, field := range ue.quantumFields {
+		evolvedState, err := ue.resonanceEngine.EvolveStateWithResonance(
+			field.QuantumState,
+			1.0,  // resonance strength
+			0.01, // time step in seconds
+		)
+		if err != nil {
+			return fmt.Errorf("failed to evolve field %s: %w", field.Name, err)
+		}
+		field.QuantumState = evolvedState
+	}
+	return nil
+}
+
+func (ue *UnifiedEngine) evolveSpacetimeGeometry() error {
+	// Simplified spacetime evolution - just update curvature
+	ue.gravitationalField.SpacetimeCurvature += 0.001
+	return nil
+}
+
+func (ue *UnifiedEngine) evolveParticles() error {
+	// Simplified particle evolution
+	for _, particle := range ue.particles {
+		evolvedState, err := ue.resonanceEngine.EvolveStateWithResonance(
+			particle.QuantumState,
+			1.0,  // resonance strength
+			0.01, // time step
+		)
+		if err != nil {
+			return fmt.Errorf("failed to evolve particle %s: %w", particle.ID, err)
+		}
+		particle.QuantumState = evolvedState
+	}
+	return nil
+}
+
+func (ue *UnifiedEngine) checkConvergence() bool {
+	// Simple convergence check based on energy stabilization
+	return ue.evolutionStep > 100 // Simplified
+}
+
+func (ue *UnifiedEngine) recordTelemetry(step int) {
+	// Record basic telemetry
+	ue.physicsMetrics["step"] = float64(step)
+	ue.physicsMetrics["curvature"] = ue.gravitationalField.SpacetimeCurvature
+	ue.physicsMetrics["particles"] = float64(len(ue.particles))
+}

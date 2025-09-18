@@ -266,7 +266,7 @@ func (hqe *HQEEngine) initializeBulkGeometry() error {
 func (hqe *HQEEngine) initializeHolographicSlices() error {
 	hqe.holographicSlices = make([]*HolographicSlice, hqe.config.SliceCount)
 
-	statesDimension := hqe.resonanceEngine.GetDimension()
+	_ = hqe.resonanceEngine.GetDimension() // Used for validation, can be removed if not needed
 
 	for i := 0; i < hqe.config.SliceCount; i++ {
 		// Radial depth from boundary (z=0) to interior
@@ -327,7 +327,13 @@ func (hqe *HQEEngine) generateSliceAmplitudes(radialDepth float64, stateIndex in
 
 	for i := 0; i < dimension; i++ {
 		// Use prime-based encoding with radial modulation
-		prime := float64(hqe.resonanceEngine.GetPrimes().GetNthPrime(i))
+		primeBasis := hqe.resonanceEngine.GetPrimeBasis()
+		var prime float64
+		if i < len(primeBasis) {
+			prime = float64(primeBasis[i])
+		} else {
+			prime = float64(i + 2) // Fallback to simple sequence
+		}
 
 		// Holographic encoding: amplitudes decay with radial depth
 		radialFactor := math.Exp(-radialDepth / hqe.config.AdSRadius)
@@ -444,7 +450,13 @@ func (hqe *HQEEngine) generateBoundaryAmplitudes(position []float64, stateIndex 
 	normFactor := 0.0
 
 	for i := 0; i < dimension; i++ {
-		prime := float64(hqe.resonanceEngine.GetPrimes().GetNthPrime(i))
+		primeBasis := hqe.resonanceEngine.GetPrimeBasis()
+		var prime float64
+		if i < len(primeBasis) {
+			prime = float64(primeBasis[i])
+		} else {
+			prime = float64(i + 2) // Fallback to simple sequence
+		}
 
 		// Boundary encoding: amplitudes based on position and prime resonance
 		phase := 2.0 * math.Pi * (prime*positionMag + float64(stateIndex)) / 20.0

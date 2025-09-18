@@ -22,7 +22,7 @@ func (hqe *HQEEngine) initializeEntanglementGraph() error {
 	nodeIndex := 0
 
 	// Create nodes for boundary states
-	for i, boundaryState := range hqe.boundaryStates {
+	for _, boundaryState := range hqe.boundaryStates {
 		node := &EntanglementNode{
 			ID:           nodeIndex,
 			Position:     append([]float64{}, boundaryState.Position...),
@@ -285,11 +285,13 @@ func (hqe *HQEEngine) evolveBulkGeometry() error {
 	// Evolve each holographic slice
 	for _, slice := range hqe.holographicSlices {
 		// Evolve quantum states in the slice
-		for _, state := range slice.QuantumStates {
-			if err := hqe.resonanceEngine.EvolveStateWithResonance(
-				state, dt, 0.3); err != nil {
+		for i, state := range slice.QuantumStates {
+			evolvedState, err := hqe.resonanceEngine.EvolveStateWithResonance(
+				state, dt, 0.3)
+			if err != nil {
 				return fmt.Errorf("quantum evolution failed: %w", err)
 			}
+			slice.QuantumStates[i] = evolvedState
 		}
 
 		// Update slice metrics
@@ -353,10 +355,12 @@ func (hqe *HQEEngine) evolveBoundaryStates() error {
 
 	for _, boundaryState := range hqe.boundaryStates {
 		// Evolve quantum state
-		if err := hqe.resonanceEngine.EvolveStateWithResonance(
-			boundaryState.QuantumState, dt, 0.5); err != nil {
+		evolvedState, err := hqe.resonanceEngine.EvolveStateWithResonance(
+			boundaryState.QuantumState, dt, 0.5)
+		if err != nil {
 			return fmt.Errorf("boundary state evolution failed: %w", err)
 		}
+		boundaryState.QuantumState = evolvedState
 
 		// Update energy
 		boundaryState.Energy = boundaryState.QuantumState.Energy
